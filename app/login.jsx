@@ -11,16 +11,16 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.appContainer}>
       <View style={styles.form}>
         <LogInput
-          label="Email cím"        // Ez lesz a címke
-          value={name}      // Az aktuális érték
-          onChangeText={setName} // A függvény, ami frissíti az értéket
+          label="Email cím" 
+          value={name} 
+          onChangeText={setName} 
         />
         
         <LogInput
           label="Jelszó"
           value={email}
           onChangeText={setEmail}
-          keyboardType="email-address" // Átadhatsz bármilyen TextInput prop-ot
+          keyboardType="email-address"
         />
       </View>
     </SafeAreaView>
