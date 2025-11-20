@@ -22,7 +22,7 @@ export function LogInput({ label, value, onChangeText, ...props }) {
 
   const labelTop = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [18, 0], // Lent: 18px-re, Fent: 0px-re
+    outputRange: [18, 0],
   });
 
   const labelFontSize = animatedValue.interpolate({
@@ -53,6 +53,7 @@ export function LogInput({ label, value, onChangeText, ...props }) {
         value={value}
         onChangeText={onChangeText}
         onFocus={handleFocus}
+        autoCapitalize="none"
         onBlur={handleBlur}
         style={styles.input}
       />

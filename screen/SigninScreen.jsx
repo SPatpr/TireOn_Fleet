@@ -1,0 +1,250 @@
+import React, { useRef, useCallback } from 'react';
+import { 
+    View, 
+    Text, 
+    TouchableOpacity, 
+    TextInput,
+    Platform,
+    StyleSheet ,
+    StatusBar
+} from 'react-native';
+import * as Animatable from 'react-native-animatable';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FontAwesome, Feather } from '@expo/vector-icons';
+import { useTheme } from 'react-native-paper';
+import { useFocusEffect } from '@react-navigation/native';
+
+const SignInScreen = ({navigation}) => {
+
+    const { colors } = useTheme();
+    
+    const viewRef = useRef(null);
+
+    const [data, setData] = React.useState({
+        username: '',
+        password: '',
+        check_textInputChange: false,
+        secureTextEntry: true,
+        isValidUser: true,
+        isValidPassword: true,
+    });
+
+    useFocusEffect(
+        useCallback(() => {
+            if (viewRef.current) {
+                viewRef.current.fadeInUpBig();
+            }
+        }, [])
+    );
+
+    const handleSignUpPress = () => {
+        if (viewRef.current) {
+            viewRef.current.fadeOutDownBig(500).then(() => {
+                navigation.navigate('SignUpScreen');
+            });
+        }
+    };
+
+    const updateSecureTextEntry = () => {
+        setData({
+            ...data,
+            secureTextEntry: !data.secureTextEntry
+        });
+    }
+
+    return (
+      <View style={styles.container}>
+          <StatusBar backgroundColor='#0A2342' barStyle="light-content"/>
+        
+        <View style={styles.header}>
+            <Text style={styles.text_header}>Welcome!</Text>
+        </View>
+        
+        <Animatable.View 
+            ref={viewRef}
+            animation="fadeInUpBig" 
+            style={[styles.footer, {
+                backgroundColor: '#fff'
+            }]}
+        >
+            <Text style={[styles.text_footer, {
+                color: '#0A2342'
+            }]}>Username</Text>
+            <View style={styles.action}>
+                <FontAwesome 
+                    name="user-o"
+                    color="#0A2342"
+                    size={20}
+                />
+                <TextInput 
+                    placeholder="Your Username"
+                    placeholderTextColor="#666666"
+                    style={[styles.textInput, {
+                        color: '#0A2342'
+                    }]}
+                    autoCapitalize="none"
+                />
+                {data.check_textInputChange ? 
+                <Animatable.View
+                    animation="bounceIn"
+                >
+                    <Feather 
+                        name="check-circle"
+                        color="#0A2342"
+                        size={20}
+                    />
+                </Animatable.View>
+                : null}
+            </View>
+            { data.isValidUser ? null : 
+            <Animatable.View animation="fadeInLeft" duration={500}>
+            <Text style={styles.errorMsg}>Username must be 4 characters long.</Text>
+            </Animatable.View>
+            }
+            
+
+            <Text style={[styles.text_footer, {
+                color: '#0A2342',
+                marginTop: 35
+            }]}>Password</Text>
+            <View style={styles.action}>
+                <Feather 
+                    name="lock"
+                    color="#0A2342"
+                    size={20}
+                />
+                <TextInput 
+                    placeholder="Your Password"
+                    placeholderTextColor="#666666"
+                    secureTextEntry={data.secureTextEntry ? true : false}
+                    style={[styles.textInput, {
+                        color: '#0A2342'
+                    }]}
+                    autoCapitalize="none"
+                />
+                <TouchableOpacity
+                    onPress={updateSecureTextEntry}
+                >
+                    {data.secureTextEntry ? 
+                    <Feather 
+                        name="eye-off"
+                        color="grey"
+                        size={20}
+                    />
+                    :
+                    <Feather 
+                        name="eye"
+                        color="grey"
+                        size={20}
+                    />
+                    }
+                </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity>
+                <Text style={{color: '#0A2342', marginTop:15}}>Forgot password?</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.button}>
+                <TouchableOpacity
+                    style={styles.signIn}
+                    onPress={() => { /* Login handle */ }}
+                >
+                <LinearGradient
+                    colors={['#0A2342', '#0A2342']}
+                    style={styles.signIn}
+                >
+                    <Text style={[styles.textSign, {
+                        color:'#fff'
+                    }]}>Sign In</Text>
+                </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    onPress={handleSignUpPress}
+                    style={[styles.signIn, {
+                        borderColor: '#0A2342',
+                        borderWidth: 1,
+                        marginTop: 15
+                    }]}
+                >
+                    <Text style={[styles.textSign, {
+                        color: '#0A2342'
+                    }]}>Sign Up</Text>
+                </TouchableOpacity>
+            </View>
+        </Animatable.View>
+      </View>
+    );
+};
+
+export default SignInScreen;
+
+const styles = StyleSheet.create({
+    container: {
+      flex: 1, 
+      backgroundColor: '#0A2342' 
+    },
+    header: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        paddingHorizontal: 20,
+        paddingBottom: 50
+    },
+    footer: {
+        flex: 3,
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        paddingHorizontal: 20,
+        paddingVertical: 30
+    },
+    text_header: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 30
+    },
+    text_footer: {
+        color: '#0A2342',
+        fontSize: 18
+    },
+    action: {
+        flexDirection: 'row',
+        marginTop: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f2f2f2',
+        paddingBottom: 5
+    },
+    actionError: {
+        flexDirection: 'row',
+        marginTop: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#FF0000',
+        paddingBottom: 5
+    },
+    textInput: {
+        flex: 1,
+        marginTop: Platform.OS === 'ios' ? 0 : -12,
+        paddingLeft: 10,
+        color: '#0A2342',
+    },
+    errorMsg: {
+        color: '#FF0000',
+        fontSize: 14,
+    },
+    button: {
+        alignItems: 'center',
+        marginTop: 50
+    },
+    signIn: {
+        width: '100%',
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 10
+    },
+    textSign: {
+        fontSize: 18,
+        fontWeight: 'bold'
+    }
+  });
