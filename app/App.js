@@ -6,7 +6,11 @@ import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 
 import SignInScreen from '../screens/SigninScreen.jsx';
 import SignUpScreen from '../screens/SignupScreen.jsx';
+
+
 import SideNav from '../components/sideNav.jsx';
+import BotNav from '../components/botNav.jsx';
+
 
 const Stack = createStackNavigator();
 
@@ -27,10 +31,12 @@ const App = () => {
             screenOptions={{ 
                 headerShown: false,
                 cardStyle: { backgroundColor: '#0A2342' } 
-            }}>
+            }}
+            >
           
           <Stack.Screen name="SignInScreen" component={SignInScreen} />
           <Stack.Screen name="SignUpScreen" component={SignUpScreen} />
+
           <Stack.Screen name="HomeScreen" component={SideNav} />
           
         </Stack.Navigator>

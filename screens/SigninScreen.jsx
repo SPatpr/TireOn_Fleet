@@ -39,7 +39,7 @@ const SignInScreen = ({navigation}) => {
 
     const handleSignUpPress = () => {
         console.log("LOG", "Sign Up");
-         navigation.navigate('SignUpScreen');
+         navigation.replace('SignUpScreen');
         
     };
 

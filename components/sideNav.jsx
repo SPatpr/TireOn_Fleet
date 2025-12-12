@@ -1,10 +1,9 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { StyleSheet } from 'react-native';
-//import { Drawer } from 'react-native-paper';
 
 import ProfileScreen from '../screens/ProfileScreen';
-import HomeScreen from '../screens/HomeScreen';
+import BotNav from './botNav';
 
 const Drawer = createDrawerNavigator();
 
@@ -15,19 +14,20 @@ const SideNav = () => {
                 drawerType="front"
                 initialRouteName="Home"
                 screenOptions={{
-                    activeTintColor: '#e91e63',
-                    itemStyle: { marginVertical: 10 },
+                    headerShown: false,
+                    drawerActiveTintColor: '#e91e63',
+                    drawerItemStyle: { marginVertical: 10 },
        }}>
         
-            <Drawer.Screen 
-                name="Home" 
-                component={HomeScreen} 
+            <Drawer.Screen
+                name="Home"
+                component={BotNav}
                 options={{ title: 'Home' }}
             />
 
-            <Drawer.Screen 
-                name="Profile" 
-                component={ProfileScreen} 
+            <Drawer.Screen
+                name="Profile"
+                component={ProfileScreen}
                 options={{ title: 'Profilom' }}
             />
             
