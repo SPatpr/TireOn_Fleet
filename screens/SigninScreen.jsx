@@ -37,12 +37,7 @@ const SignInScreen = ({navigation}) => {
             email: data.email,
             password: data.password
         });
-
-        Alert.alert('Siker!', 'A fiók sikeresen bejelentkezett.', [
-            { text: 'OK', onPress: () => navigation.navigate('SignInScreen') }
-        ]);
-        
-
+        console.log("DEBUG", "Sikeres bejelentkezés");
     } catch (error) {
         Alert.alert('Bejelentkezés hiba', "Helytelen email vagy jelszó.");
     }
