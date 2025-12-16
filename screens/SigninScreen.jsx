@@ -1,24 +1,53 @@
-import React, { useRef, useCallback } from 'react';
-import { 
-    View, 
-    Text, 
-    TouchableOpacity, 
-    TextInput,
+import { Feather, FontAwesome } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useRef } from 'react';
+import {
+    Alert,
     Platform,
-    StyleSheet ,
-    StatusBar
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import * as Animatable from 'react-native-animatable';
-import { LinearGradient } from 'expo-linear-gradient';
-import { FontAwesome, Feather } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
-import { useFocusEffect } from '@react-navigation/native';
+import { SignIn } from '../api/authAPI';
+
+
+
+
 
 const SignInScreen = ({navigation}) => {
 
     const { colors } = useTheme();
     
     const viewRef = useRef(null);
+
+        const handleRegister = async () => {
+    if ( !data.email || !data.password ) {
+        Alert.alert('Hiba', 'Kérlek tölts ki minden mezőt!');
+        return;
+    }
+
+    try {
+        await SignIn({
+            email: data.email,
+            password: data.password
+        });
+
+        Alert.alert('Siker!', 'A fiók sikeresen bejelentkezett.', [
+            { text: 'OK', onPress: () => navigation.navigate('SignInScreen') }
+        ]);
+        
+
+    } catch (error) {
+        Alert.alert('Bejelentkezés hiba', "Helytelen email vagy jelszó.");
+    }
+};
+
 
     const [data, setData] = React.useState({
         username: '',
@@ -28,6 +57,14 @@ const SignInScreen = ({navigation}) => {
         isValidUser: true,
         isValidPassword: true,
     });
+
+    const textInputChange = (val, field) => {
+    setData({
+        ...data,
+        [field]: val
+    });
+    }
+
 
     useFocusEffect(
         useCallback(() => {
@@ -42,12 +79,7 @@ const SignInScreen = ({navigation}) => {
          navigation.replace('SignUpScreen');
         
     };
-
-    const handleHomePress = () => {
-        console.log("DEBUG", "Home");
-         navigation.navigate('HomeScreen');  
-    };
-    
+  
 
     const updateSecureTextEntry = () => {
         setData({
@@ -75,20 +107,20 @@ const SignInScreen = ({navigation}) => {
         >
             <Text style={[styles.text_footer, {
                 color: '#0A2342'
-            }]}>Username</Text>
+            }]}>Email Cím</Text>
             <View style={styles.action}>
                 <FontAwesome 
-                    name="user-o"
+                    name="mail"
                     color="#0A2342"
                     size={20}
                 />
                 <TextInput 
-                    placeholder="Your Username"
+                    placeholder="Az email címed"
                     placeholderTextColor="#666666"
-                    style={[styles.textInput, {
-                        color: '#0A2342'
-                    }]}
+                    style={styles.textInput}
                     autoCapitalize="none"
+                    keyboardType="email-address"
+                    onChangeText={(val) => textInputChange(val, 'email')}
                 />
                 {data.check_textInputChange ? 
                 <Animatable.View
@@ -112,7 +144,7 @@ const SignInScreen = ({navigation}) => {
             <Text style={[styles.text_footer, {
                 color: '#0A2342',
                 marginTop: 35
-            }]}>Password</Text>
+            }]}>Jelszó</Text>
             <View style={styles.action}>
                 <Feather 
                     name="lock"
@@ -120,13 +152,12 @@ const SignInScreen = ({navigation}) => {
                     size={20}
                 />
                 <TextInput 
-                    placeholder="Your Password"
+                    placeholder="Jelszó"
                     placeholderTextColor="#666666"
                     secureTextEntry={data.secureTextEntry ? true : false}
-                    style={[styles.textInput, {
-                        color: '#0A2342'
-                    }]}
+                    style={styles.textInput}
                     autoCapitalize="none"
+                    onChangeText={(val) => textInputChange(val, 'password')}
                 />
                 <TouchableOpacity
                     onPress={updateSecureTextEntry}
@@ -153,9 +184,8 @@ const SignInScreen = ({navigation}) => {
             
             <View style={styles.button}>
                 <TouchableOpacity
-                    onPress={handleHomePress}
+                    onPress={handleRegister}
                     style={styles.signIn}
-                    //onPress={() => {/* TODO: Login handle */ }}
                 >
                 <LinearGradient
                     colors={['#0A2342', '#0A2342']}
