@@ -1,8 +1,8 @@
-import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { StyleSheet } from 'react-native';
 
 import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import BotNav from './botNav';
 
 const Drawer = createDrawerNavigator();
@@ -30,6 +30,12 @@ const SideNav = () => {
                 component={ProfileScreen}
                 options={{ title: 'Profilom' }}
             />
+
+            <Drawer.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{ title: 'Beállítások' }}
+            />
             
         </Drawer.Navigator>
             
@@ -39,10 +45,10 @@ const SideNav = () => {
 
 export default SideNav;
 
-/*const styles = StyleSheet.create({
+const styles = StyleSheet.create({
     container: {
       flex: 1, 
       backgroundColor: '#0A2342'
     },
-});   */
+});   
 

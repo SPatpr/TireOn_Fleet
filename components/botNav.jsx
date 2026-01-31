@@ -1,14 +1,17 @@
-import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 
 import HomeScreen from '../screens/HomeScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import TruckScreen from '../screens/TruckScreen';
 
 const Tab = createBottomTabNavigator();
 
 const BotNav = () => {
+
+
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -35,6 +38,7 @@ const BotNav = () => {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="My Truck" component={TruckScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };

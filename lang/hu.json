@@ -1,0 +1,22 @@
+{
+  "common": {
+    "save": "Mentés",
+    "cancel": "Mégse",
+    "loading": "Betöltés...",
+    "error": "Hiba történt"
+  },
+  "auth": {
+    "login_btn": "Bejelentkezés",
+    "register_btn": "Regisztráció",
+    "email_placeholder": "Add meg az email címed"
+  },
+  "profile": {
+    "title": "Profilom",
+    "change_photo": "Profilkép módosítása",
+    "personal_details": "Személyes adatok"
+  },
+  "settings": {
+    "dark_mode": "Sötét mód",
+    "language": "Nyelv"
+  }
+}
