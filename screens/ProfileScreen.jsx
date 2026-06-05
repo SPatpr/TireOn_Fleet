@@ -1,44 +1,36 @@
-import { decode } from 'base64-arraybuffer';
-import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker"; // Az új könyvtár importálása
+import { useEffect, useState } from "react";
 import {
-  Avatar,
-  Badge,
-  Button,
-  Divider,
-  List,
-  Surface,
-  Switch,
-  Text,
-  TextInput,
-  useTheme
-} from 'react-native-paper';
-// Fontos: Használjunk MaterialCommunityIcons-t a szép ikonokért
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Avatar, Divider, Text } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { signOut } from '../api/authAPI';
-import { getProfile } from '../api/profileAPI';
-import { supabase } from '../lib/supabase';
+import { signOut } from "../api/authAPI";
+import { getProfile } from "../api/profileApi";
+import { ENUM_LABELS } from "../constans";
+import { supabase } from "../lib/supabase";
 
 const ProfileScreen = () => {
-  const theme = useTheme();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-
-  // Állapotok a kapcsolókhoz (demo)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
-
+  const [uploading, setUploading] = useState(false); // Külön állapot a kép feltöltéséhez
   const [formData, setFormData] = useState({
-    id: '',
-    full_name: '',
-    email: '',
-    phone_number: '',
-    license_number: '',
-    avatar_url: null
+    id: "",
+    full_name: "",
+    email: "",
+    phone_number: "",
+    license_number: "",
+    role: "",
+    avatar_url: null,
   });
+
+  const MAIN_BG = "#0A2342"; // Sötétkék háttér
 
   useEffect(() => {
     fetchProfile();
@@ -46,316 +38,324 @@ const ProfileScreen = () => {
 
   const fetchProfile = async () => {
     try {
-      const data = await getProfile();
+      setLoading(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const data = await getProfile(user.id);
       if (data) {
+        // Megkeressük a címkét a konstans fájlban
+        // Ha véletlenül nincs ilyen role, tartaléknak kiírjuk az eredeti adatot
+        const displayRole = ENUM_LABELS.hu.user_role[data.role] || data.role;
+
         setFormData({
-            id: data.id,
-            full_name: data.full_name || '',
-            email: data.email || '',
-            phone_number: data.phone_number || '',
-            license_number: data.license_number || 'HU-12345678',
-            avatar_url: data.avatar_url
+          id: data.id,
+          full_name: data.full_name || "Névtelen Felhasználó",
+          email: user.email || "",
+          phone_number: data.phone_number || "+36 -- --- ----",
+          license_number: data.license_number || "Nincs megadva",
+          role: displayRole,
+          avatar_url: data.avatar_url,
         });
       }
     } catch (error) {
-      console.log('Hiba:', error.message);
+      console.error("Profil hiba:", error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-        const { error } = await supabase
-            .from('profiles')
-            .update({
-                full_name: formData.full_name,
-                phone_number: formData.phone_number,
-            })
-            .eq('id', formData.id);
+  // --- ÚJ FUNKCIÓK A KÉPKEZELÉSHEZ ---
 
-        if (error) throw error;
-        
-        setIsEditing(false);
-        Alert.alert("Siker", "Profil frissítve!");
+  // 1. Engedélyek kérése és a képválasztó menü megjelenítése
+  const showImageOptions = () => {
+    Alert.alert("Profilkép módosítása", "Válassz egy lehetőséget:", [
+      { text: "Kamera megnyitása", onPress: takePhoto },
+      { text: "Választás galériából", onPress: pickImage },
+      { text: "Mégse", style: "cancel" },
+    ]);
+  };
+
+  // 2. Kép készítése kamerával
+  const takePhoto = async () => {
+    try {
+      const cameraPermission =
+        await ImagePicker.requestCameraPermissionsAsync();
+      if (cameraPermission.status !== "granted") {
+        Alert.alert("Hiba", "Nem adtál engedélyt a kamera használatára.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true, // Engedélyezi a vágást
+        aspect: [1, 1], // Négyzet alakú vágás
+        quality: 0.5, // Tömörítés a gyorsabb feltöltésért
+      });
+
+      if (!result.canceled) {
+        uploadAvatar(result.assets[0].uri);
+      }
     } catch (error) {
-        Alert.alert("Hiba", "Mentés sikertelen: " + error.message);
-    } finally {
-        setSaving(false);
+      console.error("Kamera hiba:", error);
     }
   };
 
-  const handleCancel = () => {
-      fetchProfile();
-      setIsEditing(false);
-  };
-
-  const handleImagePress = () => {
-      if (!isEditing) return;
-      Alert.alert(
-          "Profilkép módosítása",
-          "Válassz forrást:",
-          [
-              { text: "Mégse", style: "cancel" },
-              { text: "Fotózás (Kamera)", onPress: () => pickImage('camera') },
-              { text: "Galéria", onPress: () => pickImage('gallery') },
-          ]
-      );
-  };
-
-  const pickImage = async (mode) => {
-      let result;
-      const options = {
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true, aspect: [1, 1], quality: 0.5, base64: true,
-      };
-
-      if (mode === 'camera') {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') {
-              Alert.alert("Hiba", "Nincs engedély a kamera használatára.");
-              return;
-          }
-          result = await ImagePicker.launchCameraAsync(options);
-      } else {
-          result = await ImagePicker.launchImageLibraryAsync(options);
+  // 3. Kép választása galériából
+  const pickImage = async () => {
+    try {
+      const libraryPermission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (libraryPermission.status !== "granted") {
+        Alert.alert("Hiba", "Nem adtál engedélyt a galéria elérésére.");
+        return;
       }
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-          uploadAvatarToSupabase(result.assets[0]);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled) {
+        uploadAvatar(result.assets[0].uri);
       }
+    } catch (error) {
+      console.error("Galéria hiba:", error);
+    }
   };
 
-  const uploadAvatarToSupabase = async (imageAsset) => {
-      try {
-          const filePath = `${formData.id}/avatar.png`;
-          const { error: uploadError } = await supabase.storage
-              .from('avatars')
-              .upload(filePath, decode(imageAsset.base64), { contentType: 'image/png', upsert: true });
+  // 4. A kép feltöltése Supabase Storage-ba és az adatbázis frissítése
+  const uploadAvatar = async (pickedUri) => {
+    try {
+      setUploading(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
-          if (uploadError) throw uploadError;
+      // Fájlnév generálása (user_id + időbélyeg a duplikáció ellen)
+      const fileExt = pickedUri.split(".").pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
 
-          const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-          setFormData(prev => ({ ...prev, avatar_url: publicUrl })); 
-          await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', formData.id);
+      // Kép átalakítása Blob formátumba (szükséges a Supabase feltöltéshez)
+      const response = await fetch(pickedUri);
+      const blob = await response.blob();
+      const arrayBuffer = await new Response(blob).arrayBuffer();
 
-      } catch (error) {
-          Alert.alert("Hiba", "Képfeltöltés sikertelen: " + error.message);
-      }
+      // KÉP FELTÖLTÉSE A STORAGE-BA (avatars bucket)
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, arrayBuffer, {
+          contentType: blob.type,
+          upsert: true, // Ha létezik, felülírja
+        });
+
+      if (uploadError) throw uploadError;
+
+      // A FELTÖLTÖTT KÉP PUBLIKUS LINKJÉNEK LEKÉRÉSE
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatars").getPublicUrl(filePath);
+
+      // AZ ADATBÁZIS (profiles tábla) FRISSÍTÉSE AZ ÚJ LINKKEL
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      // Állapot frissítése az appban, hogy azonnal látszódjon a változás
+      setFormData({ ...formData, avatar_url: publicUrl });
+      Alert.alert("Siker", "Profilkép sikeresen frissítve!");
+    } catch (error) {
+      console.error("Feltöltési hiba:", error.message);
+      Alert.alert("Hiba", "Nem sikerült feltölteni a képet.");
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const getInitials = (name) => {
-    if(!name) return '??';
-    const names = name.split(' ');
-    let initials = names[0].substring(0, 1).toUpperCase();
-    if (names.length > 1) initials += names[names.length - 1].substring(0, 1).toUpperCase();
-    return initials;
-  };
-
-  // --- ÚJ: Segédfüggvény a lekerekített csoportokhoz ---
-  const RoundedGroup = ({ children, title }) => (
-    <View style={styles.groupContainer}>
-        {title && <Text variant="titleMedium" style={[styles.groupTitle, { color: theme.colors.onSurfaceVariant }]}>{title}</Text>}
-        <Surface style={[styles.roundedSurface, { backgroundColor: theme.colors.elevation.level2 }]} elevation={1}>
-            {children}
-        </Surface>
+  // --- Segédkomponens az adatokhoz ---
+  const DetailRow = ({ label, value }) => (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
     </View>
   );
 
-  // --- ÚJ: Egyedi List Item a jobb oldali elemek kezeléséhez ---
-  const CustomListItem = ({ title, icon, rightType, rightValue, onPress, titleStyle }) => {
-    let rightElement;
-    switch (rightType) {
-        case 'badge':
-            rightElement = <Badge style={{alignSelf:'center', backgroundColor: theme.colors.primary}}>{rightValue}</Badge>;
-            break;
-        case 'switch':
-            rightElement = <Switch value={rightValue.value} onValueChange={rightValue.onValueChange} />;
-            break;
-        case 'chevron':
-        default:
-            rightElement = <List.Icon icon="chevron-right" color={theme.colors.onSurfaceVariant} style={{margin:0}} />;
-            break;
-    }
-
-    return (
-        <List.Item
-            title={title}
-            titleStyle={titleStyle}
-            left={props => <MaterialCommunityIcons name={icon} size={24} color={titleStyle?.color || theme.colors.primary} style={{marginRight: 10, alignSelf:'center'}} />}
-            right={props => <View style={{justifyContent:'center'}}>{rightElement}</View>}
-            onPress={onPress}
-            style={styles.listItem}
-            rippleColor={theme.colors.primaryContainer}
-        />
-    );
-  }
-
-
-  // --- FŐ RENDER ---
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      
-      {/* 1. FEJLÉC (Header) */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleImagePress} disabled={!isEditing || loading}>
-            <View>
-                {formData.avatar_url ? (
-                    <Avatar.Image 
-                        size={100} 
-                        source={{ uri: formData.avatar_url + `?t=${new Date().getTime()}` }} 
-                    />
-                ) : (
-                    <Avatar.Text 
-                        size={100} 
-                        label={getInitials(formData.full_name)} 
-                        style={{ backgroundColor: theme.colors.primary }}
-                    />
-                )}
-                {isEditing && (
-                    <View style={[styles.editBadge, { backgroundColor: theme.colors.primary }]}>
-                        <MaterialCommunityIcons name="camera" size={20} color="white" />
-                    </View>
-                )}
-            </View>
-        </TouchableOpacity>
+    <SafeAreaView style={[styles.container, { backgroundColor: MAIN_BG }]}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.headerTitle}>Profile</Text>
 
-        {isEditing ? (
-             <TextInput 
-                value={formData.full_name}
-                onChangeText={(text) => setFormData({ ...formData, full_name: text })}
-                style={styles.nameInput} mode="outlined" label="Teljes név" dense
-            />
-        ) : (
-            <Text variant="headlineSmall" style={[styles.name, { color: theme.colors.onBackground }]}>
-            {formData.full_name || 'Betöltés...'}
-            </Text>
-        )}
-        
-        <Text variant="bodyMedium" style={{ color: theme.colors.secondary, marginBottom: 15 }}>
-          {formData.email}
-        </Text>
-
-        {!isEditing && (
-            <Button 
-                mode="contained-tonal" 
-                onPress={() => setIsEditing(true)} 
-                style={styles.editButton}
-                labelStyle={{ fontWeight: 'bold' }}
-            >
-                Profil szerkesztése
-            </Button>
-        )}
-      </View>
-
-      {/* 2. SZERKESZTŐ NÉZET (Ha isEditing = true) */}
-      {isEditing && (
-        <RoundedGroup title="Adatok módosítása">
-             <View style={{padding: 15}}>
-                 <TextInput
-                    label="Telefon" icon="phone" value={formData.phone_number}
-                    onChangeText={t => setFormData({...formData, phone_number: t})}
-                    mode="outlined" style={styles.editInput}
-                    left={<TextInput.Icon icon="phone" />}
-                 />
-                 <TextInput
-                    label="Jogosítvány" value={formData.license_number}
-                    mode="outlined" style={styles.editInput} disabled
-                    left={<TextInput.Icon icon="card-account-details" />}
-                 />
-                 <View style={styles.buttonRow}>
-                    <Button mode="outlined" onPress={handleCancel} style={{ flex: 1, marginRight: 10 }}>Mégse</Button>
-                    <Button mode="contained" onPress={handleSave} loading={saving} style={{ flex: 1 }}>Mentés</Button>
+        {/* FELSŐ KÁRTYA - Most már kattintható az avatar területe */}
+        <View style={styles.profileCard}>
+          <TouchableOpacity onPress={showImageOptions} disabled={uploading}>
+            <View style={styles.avatarContainer}>
+              {uploading ? (
+                // Töltés jelző, amíg a kép feltöltődik
+                <View style={[styles.placeholderAvatar, styles.loadingAvatar]}>
+                  <ActivityIndicator size="large" color="#0A2342" />
                 </View>
+              ) : formData.avatar_url ? (
+                <Avatar.Image
+                  size={120}
+                  source={{ uri: formData.avatar_url }}
+                />
+              ) : (
+                <View style={styles.placeholderAvatar}>
+                  <FontAwesome5 name="user" size={60} color="#0A2342" />
+                </View>
+              )}
+              {/* Kamera ikon a kép sarkában jelzi, hogy szerkeszthető */}
+              {!uploading && (
+                <View style={styles.editIconBadge}>
+                  <MaterialCommunityIcons
+                    name="camera"
+                    size={18}
+                    color="white"
+                  />
+                </View>
+              )}
             </View>
-        </RoundedGroup>
-      )}
+          </TouchableOpacity>
+          <Text style={styles.userName}>{formData.full_name}</Text>
+          <Text style={styles.userRole}>{formData.role}</Text>
+        </View>
 
+        {/* ALSÓ KÁRTYA - SZEMÉLYES ADATOK */}
+        <View style={styles.detailsCard}>
+          <Text style={styles.detailsTitle}>Personal Details</Text>
 
-      {/* 3. LISTA NÉZET (Ha NEM szerkesztünk) */}
-      {!isEditing && (
-        <>
-            {/* Statisztikák Csoport */}
-            <RoundedGroup title="Statisztikák">
-                <CustomListItem 
-                    title="Aktív fuvarok" 
-                    icon="steering" 
-                    rightType="badge" rightValue="2" 
-                    onPress={() => console.log('Navigálás fuvarokhoz')}
-                />
-                <Divider style={styles.divider} />
-                <CustomListItem 
-                    title="Előzmények" 
-                    icon="history" 
-                    rightType="chevron"
-                    onPress={() => console.log('Navigálás előzményekhez')}
-                />
-            </RoundedGroup>
+          <DetailRow label="Email:" value={formData.email} />
+          <Divider style={styles.divider} />
 
-            {/* Beállítások Csoport */}
-            <RoundedGroup title="Preferenciák">
-                <CustomListItem 
-                    title="Értesítések" 
-                    icon="bell-outline" 
-                    rightType="switch" 
-                    rightValue={{ value: notificationsEnabled, onValueChange: setNotificationsEnabled }}
-                />
-                <Divider style={styles.divider} />
-                <CustomListItem 
-                    title="Biometrikus azonosítás" 
-                    icon="face-recognition" 
-                    rightType="switch" 
-                    rightValue={{ value: biometricsEnabled, onValueChange: setBiometricsEnabled }}
-                />
-                <Divider style={styles.divider} />
-                 <CustomListItem 
-                    title="Jelszó módosítása" 
-                    icon="lock-reset" 
-                    rightType="chevron"
-                    onPress={() => console.log('Jelszó módosítás')}
-                />
-            </RoundedGroup>
+          <DetailRow label="Phone:" value={formData.phone_number} />
+          <Divider style={styles.divider} />
 
-            {/* Kijelentkezés Csoport */}
-            <RoundedGroup>
-                <CustomListItem 
-                    title="Kijelentkezés" 
-                    icon="logout-variant" 
-                    titleStyle={{ color: theme.colors.error, fontWeight: 'bold' }}
-                    rightType="none"
-                    onPress={async () => { await signOut(); }}
-                />
-            </RoundedGroup>
-        </>
-      )}
-      
-      <View style={{height: 40}} />{/* Alsó margó */}
-    </ScrollView>
+          <DetailRow label="License:" value={formData.license_number} />
+        </View>
+
+        {/* KIJELENTKEZÉS GOMB */}
+        <TouchableOpacity style={styles.logoutButton} onPress={() => signOut()}>
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16 },
-  header: { alignItems: 'center', marginVertical: 30 },
-  name: { marginTop: 10, fontWeight: 'bold' },
-  nameInput: { marginTop: 15, width: '80%', textAlign: 'center' },
-  editButton: { borderRadius: 20, paddingHorizontal: 10 },
-  
-  // Új stílusok a csoportosított listához
-  groupContainer: { marginBottom: 20 },
-  groupTitle: { marginLeft: 10, marginBottom: 8, fontWeight: '600' },
-  roundedSurface: { borderRadius: 16, overflow: 'hidden' }, // Ez adja a kerekítést!
-  listItem: { paddingVertical: 12 },
-  divider: { backgroundColor: 'rgba(255,255,255,0.1)' }, // Halvány elválasztó sötét módban
+  container: { flex: 1 },
+  scrollContent: { paddingHorizontal: 25, paddingBottom: 40 },
+  headerTitle: {
+    color: "white",
+    fontSize: 20,
+    textAlign: "center",
+    marginVertical: 20,
+    fontWeight: "500",
+  },
 
-  // Szerkesztő stílusok
-  editInput: { marginBottom: 15, backgroundColor: 'transparent' },
-  buttonRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  editBadge: {
-      position: 'absolute', bottom: 0, right: 0, borderRadius: 20,
-      width: 36, height: 36, justifyContent: 'center', alignItems: 'center', elevation: 4
-  }
+  profileCard: {
+    backgroundColor: "white",
+    borderRadius: 30,
+    paddingVertical: 40,
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  avatarContainer: {
+    marginBottom: 15,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    position: "relative", // Szükséges a kamera ikon pozicionálásához
+  },
+  placeholderAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#f0f4f8",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: "#0A2342",
+  },
+  loadingAvatar: { borderColor: "rgba(10, 35, 66, 0.2)" }, // Halványabb keret töltéskor
+  userName: {
+    fontSize: 42,
+    fontWeight: "bold",
+    color: "#0A2342",
+    textAlign: "center",
+  },
+  userRole: { fontSize: 18, color: "#333", marginTop: 5 },
+
+  editIconBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#1e3a5f",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "white",
+  },
+
+  detailsCard: {
+    backgroundColor: "white",
+    borderRadius: 30,
+    padding: 25,
+    marginBottom: 30,
+  },
+  detailsTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#0A2342",
+    marginBottom: 20,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  detailLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000",
+    width: "30%",
+  },
+  detailValue: {
+    fontSize: 16,
+    color: "#333",
+    width: "70%",
+    textAlign: "right",
+  },
+  divider: { backgroundColor: "#e2e8f0", height: 1 },
+
+  logoutButton: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    height: 60,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  logoutText: { fontSize: 24, fontWeight: "bold", color: "#0A2342" },
 });
 
 export default ProfileScreen;
