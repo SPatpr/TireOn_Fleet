@@ -1,0 +1,49 @@
+name: EAS Preview OTA Update
+
+# Automatikusan fut, amint push érkezik a main vagy a test ágra.
+# Egy Over-The-Air (OTA) frissítést publikál a "preview" EAS branchre,
+# így a teszt-buildek a következő appindításnál azonnal megkapják az új
+# JS kódot – ÚJ APK/IPA letöltése NÉLKÜL.
+on:
+  push:
+    branches:
+      - main
+      - test
+  workflow_dispatch: {} # kézi indítás is engedélyezett
+
+# Egyszerre csak egy update fusson ágonként (a régit megszakítja)
+concurrency:
+  group: eas-update-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Publish OTA update
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Repository klónozása
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Node.js környezet
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 🚀 Expo / EAS CLI + hitelesítés (EAS_TOKEN secret)
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EAS_TOKEN }}
+
+      - name: 📦 Függőségek telepítése
+        run: npm ci
+
+      - name: 📲 OTA frissítés publikálása a preview csatornára
+        run: eas update --branch preview --message "${{ github.event.head_commit.message }}" --non-interactive
+        env:
+          # A teszt-bundle a TESZT Supabase adatbázist használja
+          # (külön a GitHub Secrets-ben tárolva, az élestől elválasztva).
+          EXPO_PUBLIC_APP_ENV: preview
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}

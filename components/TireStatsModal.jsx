@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { DEFAULT_TIRE_LIMITS, validateTireValues } from "../lib/tireLimits";
 
 const STATUS_OPTIONS = [
   { value: "good",     label: "Megfelelő",    color: "#16a34a", bg: "rgba(22,163,74,0.10)" },
@@ -14,21 +15,29 @@ const STATUS_OPTIONS = [
   { value: "critical", label: "Kritikus",     color: "#dc2626", bg: "rgba(220,38,38,0.10)" },
 ];
 
-const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving }) => {
+const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving, limits = DEFAULT_TIRE_LIMITS, readOnly = false }) => {
   const [pressure, setPressure] = useState("");
   const [tread,    setTread]    = useState("");
   const [status,   setStatus]   = useState("good");
+  const [errors,   setErrors]   = useState({});
 
   useEffect(() => {
     if (tire) {
       setPressure(tire.pressure != null ? String(tire.pressure) : "");
       setTread(tire.tread       != null ? String(tire.tread)    : "");
       setStatus(tire.status ?? "good");
+      setErrors({});
     }
   }, [tire, visible]);
 
   const handleSave = () => {
     if (!tire) return;
+    // Kliensoldali tartomány-validáció (a járműtípus limitjei alapján)
+    const { valid, errors: rangeErrors } = validateTireValues({ pressureBar: pressure, treadMm: tread }, limits);
+    if (!valid) {
+      setErrors(rangeErrors);
+      return;
+    }
     onSave({ id: tire.id, pressure, tread, status });
   };
 
@@ -43,7 +52,7 @@ const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving }) => {
         <View style={styles.card}>
           {/* FEJLÉC */}
           <View style={styles.header}>
-            <Text style={styles.title}>Kerék adatai</Text>
+            <Text style={styles.title}>{readOnly ? "Kerék állapota" : "Kerék adatai"}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={12}>
               <Text style={styles.closeX}>✕</Text>
             </TouchableOpacity>
@@ -52,34 +61,38 @@ const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving }) => {
           {/* NYOMÁS */}
           <View style={styles.row}>
             <Text style={styles.label}>Nyomás:</Text>
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, errors.pressure && styles.inputWrapperError]}>
               <TextInput
                 value={String(pressure)}
-                onChangeText={setPressure}
+                onChangeText={(v) => { setPressure(v); setErrors((e) => ({ ...e, pressure: undefined })); }}
                 style={styles.input}
                 keyboardType="decimal-pad"
                 placeholder="pl. 9.2"
                 placeholderTextColor="#adb5bd"
+                editable={!readOnly}
               />
               <Text style={styles.unit}>bar</Text>
             </View>
           </View>
+          {errors.pressure ? <Text style={styles.errorText}>{errors.pressure}</Text> : null}
 
           {/* FUTÓFELÜLET */}
           <View style={styles.row}>
             <Text style={styles.label}>Futófelület:</Text>
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, errors.tread && styles.inputWrapperError]}>
               <TextInput
                 value={String(tread)}
-                onChangeText={setTread}
+                onChangeText={(v) => { setTread(v); setErrors((e) => ({ ...e, tread: undefined })); }}
                 style={styles.input}
                 keyboardType="decimal-pad"
                 placeholder="pl. 8"
                 placeholderTextColor="#adb5bd"
+                editable={!readOnly}
               />
               <Text style={styles.unit}>mm</Text>
             </View>
           </View>
+          {errors.tread ? <Text style={styles.errorText}>{errors.tread}</Text> : null}
 
           {/* STÁTUSZ */}
           <Text style={styles.statusLabel}>Állapot</Text>
@@ -89,11 +102,13 @@ const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving }) => {
               return (
                 <TouchableOpacity
                   key={opt.value}
-                  onPress={() => setStatus(opt.value)}
+                  onPress={() => !readOnly && setStatus(opt.value)}
+                  disabled={readOnly}
                   style={[
                     styles.statusBtn,
                     { borderColor: opt.color },
                     isActive && { backgroundColor: opt.bg },
+                    readOnly && !isActive && { opacity: 0.4 },
                   ]}
                 >
                   <View style={[styles.statusDot, { backgroundColor: opt.color }]} />
@@ -105,16 +120,24 @@ const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving }) => {
             })}
           </View>
 
-          {/* MENTÉS */}
-          <TouchableOpacity
-            style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
-            onPress={handleSave}
-            disabled={isSaving}
-          >
-            <Text style={styles.saveBtnText}>
-              {isSaving ? "Mentés..." : "Változtatások mentése"}
-            </Text>
-          </TouchableOpacity>
+          {/* MENTÉS – sofőr (read-only) nézetben elrejtve */}
+          {readOnly ? (
+            <View style={styles.readOnlyNote}>
+              <Text style={styles.readOnlyNoteText}>
+                Csak megtekintés – a módosításhoz menedzseri jogosultság szükséges.
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={isSaving}
+            >
+              <Text style={styles.saveBtnText}>
+                {isSaving ? "Mentés..." : "Változtatások mentése"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -198,6 +221,29 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
     fontWeight: "600",
     marginLeft: 6,
+  },
+  inputWrapperError: {
+    borderColor: "#dc2626",
+    backgroundColor: "rgba(220,38,38,0.05)",
+  },
+  errorText: {
+    color: "#dc2626",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: -6,
+    marginBottom: 10,
+  },
+  readOnlyNote: {
+    backgroundColor: "#f1f5f9",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  readOnlyNoteText: {
+    color: "#64748b",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
   statusLabel: {
     fontSize: 12,

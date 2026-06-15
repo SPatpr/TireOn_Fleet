@@ -77,7 +77,7 @@ export const updateEmployee = async (id, updateData) => {
     .eq("id", user.id)
     .single();
   if (profileError || !profile) throw new Error("Profil nem található!");
-  if (!["admin", "manager"].includes(profile.role))
+  if (!["owner", "admin", "manager"].includes(profile.role))
     throw new Error("Nincs jogosultságod ezt a műveletet végezni!");
 
   // Ellenőrizzük, hogy a módosítandó alkalmazott a saját cégünkhöz tartozik-e

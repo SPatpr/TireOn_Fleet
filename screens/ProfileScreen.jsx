@@ -16,10 +16,12 @@ import { signOut } from "../api/authAPI";
 import { getProfile } from "../api/profileApi";
 import { ENUM_LABELS } from "../constans";
 import { supabase } from "../lib/supabase";
+import { isManagerLevel } from "../lib/permissions";
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false); // Külön állapot a kép feltöltéséhez
+  const [rawRole, setRawRole] = useState(null); // nyers szerepkör (gating)
   const [formData, setFormData] = useState({
     id: "",
     full_name: "",
@@ -49,6 +51,7 @@ const ProfileScreen = () => {
         // Megkeressük a címkét a konstans fájlban
         // Ha véletlenül nincs ilyen role, tartaléknak kiírjuk az eredeti adatot
         const displayRole = ENUM_LABELS.hu.user_role[data.role] || data.role;
+        setRawRole(data.role);
 
         setFormData({
           id: data.id,
@@ -229,6 +232,24 @@ const ProfileScreen = () => {
           <Text style={styles.userRole}>{formData.role}</Text>
         </View>
 
+        {/* CÉGVEZÉRLÉS BELÉPÉSI PONT – csak admin/manager/owner */}
+        {isManagerLevel(rawRole) && (
+          <TouchableOpacity
+            style={styles.adminButton}
+            activeOpacity={0.85}
+            onPress={() => navigation?.navigate("AdminDashboard")}
+          >
+            <View style={styles.adminIconBox}>
+              <MaterialCommunityIcons name="shield-account" size={24} color="#0A2342" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.adminButtonTitle}>Cégvezérlés / Adminisztráció</Text>
+              <Text style={styles.adminButtonSub}>Járművek, raktár, sofőrök és vezetőség</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={26} color="#0A2342" />
+          </TouchableOpacity>
+        )}
+
         {/* ALSÓ KÁRTYA - SZEMÉLYES ADATOK */}
         <View style={styles.detailsCard}>
           <Text style={styles.detailsTitle}>Personal Details</Text>
@@ -311,6 +332,32 @@ const styles = StyleSheet.create({
     borderColor: "white",
   },
 
+  adminButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  adminIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  adminButtonTitle: { fontSize: 16, fontWeight: "800", color: "#0A2342", letterSpacing: 0.2 },
+  adminButtonSub: { fontSize: 12, color: "#64748b", marginTop: 2 },
   detailsCard: {
     backgroundColor: "white",
     borderRadius: 30,

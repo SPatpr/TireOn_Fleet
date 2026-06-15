@@ -14,15 +14,27 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { getCompanySettings } from "../api/companyAPI";
 import { getEmployees, updateEmployee } from "../api/employee";
 import { getProfile } from "../api/profileApi";
 import AddEmployeeModal from "../components/AddEmployeeModal";
 import EditEmployeeModal from "../components/EditEmployeeModal";
 import EmployeeListItem from "../components/EmployeeListItem";
+import { canEditEmployee, DEFAULT_COMPANY_SETTINGS, isManagerLevel } from "../lib/permissions";
 
-const EmployeesScreen = () => {
+const MANAGEMENT_ROLES = ["owner", "admin", "manager"];
+
+const EmployeesScreen = ({ navigation, route }) => {
+  // roleScope: az Admin Központból nyitva 'driver' vagy 'management'
+  const roleScope = route?.params?.roleScope ?? null;
+  const scopeTitle =
+    roleScope === "driver" ? "Sofőrök"
+    : roleScope === "management" ? "Adminok & Menedzserek"
+    : null;
+
   // --- JOGOSULTSÁG ÁLLAPOTOK ---
   const [userRole, setUserRole] = useState(null);
+  const [settings, setSettings] = useState(DEFAULT_COMPANY_SETTINGS);
   const [authLoading, setAuthLoading] = useState(true);
 
   // --- ÁLLAPOTOK (STATES) ---
@@ -50,6 +62,9 @@ const EmployeesScreen = () => {
 
         if (profile) {
           setUserRole(profile.role);
+          getCompanySettings(profile.company_id)
+            .then(setSettings)
+            .catch(() => {});
         }
       } catch (error) {
         console.error(
@@ -85,13 +100,22 @@ const EmployeesScreen = () => {
 
   // Csak akkor töltünk adatot, ha a felhasználó admin vagy manager
   useEffect(() => {
-    if (userRole === "admin" || userRole === "manager") {
+    if (isManagerLevel(userRole)) {
       fetchEmployees();
     }
   }, [fetchEmployees, userRole]);
 
   // --- MŰVELETEK ---
   const handleOpenEdit = (employee) => {
+    // Jogosultság-mátrix: a menedzser csak akkor szerkeszthet sofőrt,
+    // ha a tulajdonos ezt engedélyezte.
+    if (!canEditEmployee(userRole, employee.role, settings)) {
+      Alert.alert(
+        "Nincs jogosultság",
+        "A tulajdonos beállításai szerint nincs jogosultságod ennek az alkalmazottnak a szerkesztéséhez.",
+      );
+      return;
+    }
     setSelectedEmployee(employee);
     setEditModalVisible(true);
   };
@@ -115,8 +139,13 @@ const EmployeesScreen = () => {
     const matchesSearch =
       emp.full_name?.toLowerCase().includes(searchText.toLowerCase()) ||
       emp.email?.toLowerCase().includes(searchText.toLowerCase());
-    const matchesFilter = filter === "Összes" || emp.role === filter;
 
+    // Admin Központból érkező szűkítés (felülírja a chip-szűrőt)
+    if (roleScope === "driver") return matchesSearch && emp.role === "driver";
+    if (roleScope === "management")
+      return matchesSearch && MANAGEMENT_ROLES.includes(emp.role);
+
+    const matchesFilter = filter === "Összes" || emp.role === filter;
     return matchesSearch && matchesFilter;
   });
 
@@ -132,8 +161,8 @@ const EmployeesScreen = () => {
     );
   }
 
-  // --- 2. RENDERING: Ha nincs joga (NEM admin és NEM manager) ---
-  if (userRole !== "admin" && userRole !== "manager") {
+  // --- 2. RENDERING: Ha nincs joga (NEM admin/manager/owner) ---
+  if (!isManagerLevel(userRole)) {
     return (
       <SafeAreaView style={[styles.container, styles.centerContainer]}>
         <Ionicons name="lock-closed-outline" size={80} color="#ef4444" />
@@ -146,9 +175,19 @@ const EmployeesScreen = () => {
     );
   }
 
-  // --- 3. RENDERING: Teljes hozzáférés (Admin vagy Manager) ---
+  // --- 3. RENDERING: Teljes hozzáférés (Admin / Manager / Owner) ---
   return (
     <SafeAreaView style={styles.container}>
+      {/* FEJLÉC – csak az Admin Központból nyitott (scope) nézetben */}
+      {scopeTitle && (
+        <View style={styles.scopeHeader}>
+          <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.scopeBackBtn}>
+            <Ionicons name="chevron-back" size={28} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.scopeTitle}>{scopeTitle}</Text>
+        </View>
+      )}
+
       {/* KERESŐ SÁV */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -163,7 +202,8 @@ const EmployeesScreen = () => {
         </View>
       </View>
 
-      {/* HORIZONTÁLIS SZŰRŐK */}
+      {/* HORIZONTÁLIS SZŰRŐK – scope nézetben elrejtve (a kör fix) */}
+      {!roleScope && (
       <View style={{ height: 50, marginBottom: 10 }}>
         <ScrollView
           horizontal
@@ -191,6 +231,7 @@ const EmployeesScreen = () => {
           ))}
         </ScrollView>
       </View>
+      )}
 
       {/* ALKALMAZOTT LISTA */}
       {loading && !refreshing ? (
@@ -262,6 +303,15 @@ export default EmployeesScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0A2342" },
+  scopeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 4,
+  },
+  scopeBackBtn: { marginRight: 6, marginLeft: -4 },
+  scopeTitle: { color: "white", fontSize: 24, fontWeight: "700", letterSpacing: 0.3 },
   centerContainer: {
     flex: 1,
     justifyContent: "center",

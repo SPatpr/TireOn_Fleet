@@ -1,10 +1,19 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Circle, G, Line, Path, Rect } from "react-native-svg";
-import { getTiresByVehicle, updateTireData } from "../api/tireAPI";
+import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
+import {
+  getStockTires,
+  getTiresByVehicle,
+  mountStockTire,
+  updateTireData,
+} from "../api/tireAPI";
+import { getLimitsForVehicleType } from "../api/tireSpecAPI";
+import EmptyTireActionModal from "../components/EmptyTireActionModal";
 import TireStatsModal from "../components/TireStatsModal";
+import WarehouseTireModal from "../components/WarehouseTireModal";
+import { DEFAULT_TIRE_LIMITS } from "../lib/tireLimits";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
@@ -20,15 +29,29 @@ const STATUS = {
   warning:  { color: "#ffb648", bg: "rgba(255,182,72,0.12)",  label: "FIGYELEM" },
   critical: { color: "#ff5169", bg: "rgba(255,81,105,0.15)",  label: "KRITIKUS" },
   unknown:  { color: "rgba(255,255,255,0.45)", bg: "rgba(255,255,255,0.04)", label: "ISMERETLEN" },
+  // Üres pozíció – halványszürke, inaktív
+  empty:    { color: "#334155", bg: "rgba(51,65,85,0.18)",    label: "ÜRES" },
 };
 
+// Pozíció → emberi felirat (üres pozíció rekonstruálásához is)
+const POSITION_LABELS = {
+  FL:  "Bal Első",
+  FR:  "Jobb Első",
+  RL1: "Bal Hátsó 1",
+  RL2: "Bal Hátsó 2",
+  RR1: "Jobb Hátsó 1",
+  RR2: "Jobb Hátsó 2",
+};
+
+// Mock kiindulás: minden kerék pressure (bar) ÉS tread (mm) értékkel.
+// RR2 szándékosan üres (null) – azonnal teszteli a szürke kerék logikát.
 const INITIAL_TIRES = {
-  FL:  { id: "FL",  position: "Bal Első",     status: null, pressure: null, tread: null },
-  FR:  { id: "FR",  position: "Jobb Első",    status: null, pressure: null, tread: null },
-  RL1: { id: "RL1", position: "Bal Hátsó 1",  status: null, pressure: null, tread: null },
-  RR1: { id: "RR1", position: "Jobb Hátsó 1", status: null, pressure: null, tread: null },
-  RL2: { id: "RL2", position: "Bal Hátsó 2",  status: null, pressure: null, tread: null },
-  RR2: { id: "RR2", position: "Jobb Hátsó 2", status: null, pressure: null, tread: null },
+  FL:  { id: "FL",  position: "Bal Első",     status: "good",     pressure: 9.2, tread: 14 },
+  FR:  { id: "FR",  position: "Jobb Első",    status: "good",     pressure: 8.9, tread: 13 },
+  RL1: { id: "RL1", position: "Bal Hátsó 1",  status: "warning",  pressure: 7.8, tread: 6 },
+  RR1: { id: "RR1", position: "Jobb Hátsó 1", status: "critical", pressure: 6.4, tread: 3 },
+  RL2: { id: "RL2", position: "Bal Hátsó 2",  status: "good",     pressure: 8.7, tread: 11 },
+  RR2: null, // szándékosan üres pozíció – szürke kerék
 };
 
 // SVG-koordináták (viewBox="0 0 450 800")
@@ -44,15 +67,44 @@ const TIRE_POSITIONS = {
   RR2: { x: 370, y: 599 },
 };
 
-// Meghatározza a gumi megjelenítési státuszát az aktív mód alapján
+// Adatkapszulák SVG-pozíciói (a kerekek külső oldalán; a hátsó
+// dupla kerekeknél függőlegesen egymás alá rendezve)
+const CAP_W = 46;
+const CAP_H = 18;
+const CAPSULE_POSITIONS = {
+  FL:  { x: 30,  y: 241 },
+  FR:  { x: 374, y: 241 },
+  RL1: { x: 4,   y: 607 },
+  RL2: { x: 4,   y: 629 },
+  RR1: { x: 400, y: 607 },
+  RR2: { x: 400, y: 629 },
+};
+
+// Meghatározza a gumi megjelenítési státuszát az aktív mód alapján.
+// Üres pozíció (nincs gumi) → "empty" (szürke).
 const getTireDisplayStatus = (tire, mode) => {
+  if (!tire) return "empty";
   if (mode === "tread") {
+    // Profilmélység: zöld 10-16 mm, sárga 4-9 mm, piros 4 mm alatt
     const mm = tire.tread;
-    if (mm === null) return null;
-    return mm >= 4 ? "good" : mm >= 2 ? "warning" : "critical";
+    if (mm == null) return null;
+    if (mm >= 10) return "good";
+    if (mm >= 4)  return "warning";
+    return "critical";
   }
-  // pressure mód – már elő van számítva
-  return tire.status;
+  // Nyomás: zöld 8.5-9.5 bar, sárga 7.0-8.4 bar, piros 7.0 bar alatt
+  const bar = tire.pressure;
+  if (bar == null) return null;
+  if (bar >= 8.5 && bar <= 9.5) return "good";
+  if (bar >= 7.0)               return "warning"; // 7.0-8.4 és enyhe túlnyomás
+  return "critical";
+};
+
+// Az aktív mód szerinti kapszula-szöveg
+const getCapsuleText = (tire, mode) => {
+  if (!tire) return "+";
+  if (mode === "tread") return tire.tread != null ? `${tire.tread} mm` : "– mm";
+  return tire.pressure != null ? `${tire.pressure} bar` : "– bar";
 };
 
 // Tisztán vizuális – touch kezelés az overlay TouchableOpacity-k végzik
@@ -60,6 +112,7 @@ const TireSVG = ({ pos, isSelected, displayStatus }) => {
   const { x, y } = pos;
   const s = STATUS[displayStatus] ?? STATUS.unknown;
   const isCritical = displayStatus === "critical";
+  const isEmpty = displayStatus === "empty";
 
   const pulseAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -91,11 +144,16 @@ const TireSVG = ({ pos, isSelected, displayStatus }) => {
         x={x} y={y} width={TW} height={TH} rx={4}
         stroke={isSelected ? ACC : s.color}
         strokeWidth={isSelected ? 2 : 1.5}
-        fill={isSelected ? "rgba(57,230,255,0.08)" : "rgba(57,230,255,0.03)"}
+        strokeDasharray={isEmpty ? "4 4" : undefined}
+        fill={isEmpty ? "rgba(51,65,85,0.10)" : isSelected ? "rgba(57,230,255,0.08)" : "rgba(57,230,255,0.03)"}
       />
-      <Line x1={x + 7}      y1={y + 4} x2={x + 7}      y2={y + TH - 4} stroke={s.color} strokeWidth={1.2} opacity={0.5} />
-      <Line x1={x + TW - 7} y1={y + 4} x2={x + TW - 7} y2={y + TH - 4} stroke={s.color} strokeWidth={1.2} opacity={0.5} />
-      <Circle cx={cx} cy={cy} r={3} fill={s.color} />
+      <Line x1={x + 7}      y1={y + 4} x2={x + 7}      y2={y + TH - 4} stroke={s.color} strokeWidth={1.2} opacity={isEmpty ? 0.3 : 0.5} />
+      <Line x1={x + TW - 7} y1={y + 4} x2={x + TW - 7} y2={y + TH - 4} stroke={s.color} strokeWidth={1.2} opacity={isEmpty ? 0.3 : 0.5} />
+      {isEmpty ? (
+        <SvgText x={cx} y={cy + 5} fontSize={16} fontWeight="700" fill={s.color} textAnchor="middle">+</SvgText>
+      ) : (
+        <Circle cx={cx} cy={cy} r={3} fill={s.color} />
+      )}
       {isSelected && (
         <Rect x={x - 4} y={y - 4} width={TW + 8} height={TH + 8} rx={7} fill="none" stroke={ACC} strokeWidth={1} opacity={0.6} />
       )}
@@ -129,46 +187,72 @@ const TiresScreen = ({ navigation, route }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [containerLayout, setContainerLayout] = useState({ width: 0, height: 0 });
   const [colorMode, setColorMode] = useState("pressure"); // "pressure" | "tread"
+
+  // Üres pozíció választómenü + raktári lista állapotai
+  const [emptyPos, setEmptyPos] = useState(null);
+  const [choiceVisible, setChoiceVisible] = useState(false);
+  const [warehouseVisible, setWarehouseVisible] = useState(false);
+  const [stockTires, setStockTires] = useState([]);
+  const [stockLoading, setStockLoading] = useState(false);
+
   const plateNumber = route?.params?.plateNumber || "ABC-123";
   const vehicleId = route?.params?.vehicleId ?? null;
+  const vehicleType = route?.params?.vehicleType ?? null;
+  const readOnly = route?.params?.readOnly ?? false; // sofőr: csak olvasás
+
+  // Járműtípus-specifikus határértékek (validációhoz)
+  const [limits, setLimits] = useState(DEFAULT_TIRE_LIMITS);
 
   const selectedTire = selectedId ? tires[selectedId] : null;
 
   useEffect(() => {
+    let active = true;
+    getLimitsForVehicleType(vehicleType)
+      .then((l) => { if (active) setLimits(l); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [vehicleType]);
+
+  const loadTires = useCallback(async () => {
     if (!vehicleId) return;
-    const load = async () => {
-      try {
-        const rows = await getTiresByVehicle(vehicleId);
-        if (!rows.length) return;
-        setTires((prev) => {
-          const next = { ...prev };
-          rows.forEach((row) => {
-            const pos = row.position;
-            if (next[pos]) {
-              const bar = row.current_bar != null ? parseFloat(row.current_bar) : null;
-              const mm  = row.current_mm  != null ? parseFloat(row.current_mm)  : null;
-              // Mentett státusz élvez elsőbbséget; ha nincs, nyomásból számítódik
-              const savedStatus = row.operational_status ?? null;
-              const derivedStatus = bar === null ? null
-                : bar >= 8 ? "good"
-                : bar >= 5 ? "warning"
-                : "critical";
-              next[pos] = {
-                ...next[pos],
-                pressure: bar,
-                tread: mm,
-                status: savedStatus ?? derivedStatus,
-              };
-            }
-          });
-          return next;
+    try {
+      const rows = await getTiresByVehicle(vehicleId);
+      setTires(() => {
+        // Friss alap: minden pozíció üres (null), majd a DB-ből töltjük
+        const next = Object.keys(TIRE_POSITIONS).reduce((acc, pos) => {
+          acc[pos] = null;
+          return acc;
+        }, {});
+        rows.forEach((row) => {
+          const pos = row.position;
+          if (pos in next) {
+            const bar = row.current_bar != null ? parseFloat(row.current_bar) : null;
+            const mm  = row.current_mm  != null ? parseFloat(row.current_mm)  : null;
+            next[pos] = {
+              id: pos,
+              position: POSITION_LABELS[pos] ?? pos,
+              pressure: bar,
+              tread: mm,
+              status: row.operational_status ?? "good",
+            };
+          }
         });
-      } catch (err) {
-        console.error("Tire load error:", err.message);
-      }
-    };
-    load();
+        return next;
+      });
+    } catch (err) {
+      console.error("Tire load error:", err.message);
+    }
   }, [vehicleId]);
+
+  useEffect(() => {
+    loadTires();
+  }, [loadTires]);
+
+  // Visszatéréskor (pl. AddTire képernyőről) frissítünk
+  useEffect(() => {
+    const unsub = navigation?.addListener?.("focus", loadTires);
+    return unsub;
+  }, [navigation, loadTires]);
 
   const counts = Object.values(tires).reduce(
     (acc, t) => {
@@ -182,8 +266,64 @@ const TiresScreen = ({ navigation, route }) => {
   );
 
   const handleTirePress = (tireId) => {
+    // Üres (szürke) pozíció → választómenü a TireStatsModal helyett
+    if (!tires[tireId]) {
+      if (readOnly) return; // sofőr nem vehet fel kereket
+      setEmptyPos(tireId);
+      setChoiceVisible(true);
+      return;
+    }
     setSelectedId(tireId);
     setModalVisible(true);
+  };
+
+  // "Új kerék hozzáadása" – AddTire képernyő előválasztott pozícióval
+  const handleAddNew = () => {
+    const pos = emptyPos;
+    setChoiceVisible(false);
+    setEmptyPos(null);
+    navigation?.navigate("AddTire", { vehicleId, plateNumber, position: pos, vehicleType });
+  };
+
+  // "Választás a raktárból" – raktári lista betöltése és megnyitása
+  const handleChooseFromStock = async () => {
+    setChoiceVisible(false);
+    setWarehouseVisible(true);
+    setStockLoading(true);
+    try {
+      setStockTires(await getStockTires());
+    } catch (err) {
+      console.error("Stock load error:", err.message);
+      setStockTires([]);
+    } finally {
+      setStockLoading(false);
+    }
+  };
+
+  // Raktári gumi felszerelése az üres pozícióra
+  const handleMountStock = async (stockTire) => {
+    const pos = emptyPos;
+    if (!pos) return;
+    try {
+      if (vehicleId) await mountStockTire(stockTire.id, vehicleId, pos);
+      const bar = stockTire.current_bar != null ? parseFloat(stockTire.current_bar) : null;
+      const mm  = stockTire.current_mm  != null ? parseFloat(stockTire.current_mm)  : null;
+      setTires((prev) => ({
+        ...prev,
+        [pos]: {
+          id: pos,
+          position: POSITION_LABELS[pos] ?? pos,
+          pressure: bar,
+          tread: mm,
+          status: stockTire.operational_status ?? "good",
+        },
+      }));
+    } catch (err) {
+      console.error("Mount stock error:", err.message);
+    } finally {
+      setWarehouseVisible(false);
+      setEmptyPos(null);
+    }
   };
 
   const handleModalClose = () => {
@@ -347,6 +487,32 @@ const TiresScreen = ({ navigation, route }) => {
               displayStatus={getTireDisplayStatus(tires[id], colorMode)}
             />
           ))}
+
+          {/* ADATKAPSZULÁK – aktív mód szerint bar / mm, státusz színnel */}
+          {Object.entries(CAPSULE_POSITIONS).map(([id, cp]) => {
+            const tire = tires[id];
+            const ds = getTireDisplayStatus(tire, colorMode);
+            const s = STATUS[ds] ?? STATUS.unknown;
+            return (
+              <G key={`cap-${id}`}>
+                <Rect
+                  x={cp.x} y={cp.y} width={CAP_W} height={CAP_H} rx={CAP_H / 2}
+                  fill={s.bg} stroke={s.color} strokeWidth={1}
+                  strokeDasharray={ds === "empty" ? "3 3" : undefined}
+                />
+                <SvgText
+                  x={cp.x + CAP_W / 2}
+                  y={cp.y + CAP_H / 2 + 3.5}
+                  fontSize={10}
+                  fontWeight="700"
+                  fill={s.color}
+                  textAnchor="middle"
+                >
+                  {getCapsuleText(tire, colorMode)}
+                </SvgText>
+              </G>
+            );
+          })}
         </Svg>
 
         {/* TOUCH OVERLAY-EK – abszolút pozicionált, az SVG koordinátákból számítva */}
@@ -374,7 +540,52 @@ const TiresScreen = ({ navigation, route }) => {
         tire={selectedTire}
         onSave={handleSave}
         isSaving={isSaving}
+        limits={limits}
+        readOnly={readOnly}
       />
+
+      {/* ÜRES POZÍCIÓ – VÁLASZTÓMENÜ */}
+      <EmptyTireActionModal
+        visible={choiceVisible}
+        position={emptyPos}
+        positionLabel={emptyPos ? POSITION_LABELS[emptyPos] : null}
+        onChooseFromStock={handleChooseFromStock}
+        onAddNew={handleAddNew}
+        onClose={() => {
+          setChoiceVisible(false);
+          setEmptyPos(null);
+        }}
+      />
+
+      {/* RAKTÁRI GUMIK – LISTA */}
+      <WarehouseTireModal
+        visible={warehouseVisible}
+        positionLabel={emptyPos ? POSITION_LABELS[emptyPos] : null}
+        tires={stockTires}
+        loading={stockLoading}
+        onSelect={handleMountStock}
+        onClose={() => {
+          setWarehouseVisible(false);
+          setEmptyPos(null);
+        }}
+      />
+
+      {/* GUMI HOZZÁADÁSA – lebegő gomb (FAB); sofőr (read-only) nem látja */}
+      {!readOnly && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() =>
+            navigation?.navigate("AddTire", {
+              vehicleId,
+              plateNumber,
+              vehicleType,
+            })
+          }
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="plus" size={28} color="white" />
+        </TouchableOpacity>
+      )}
 
       {/* JELMAGYARÁZAT */}
       <View style={styles.legendContainer}>
@@ -519,6 +730,22 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 13,
     fontWeight: "600",
+  },
+  fab: {
+    position: "absolute",
+    bottom: 90,
+    right: 20,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#0A2342",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });
 

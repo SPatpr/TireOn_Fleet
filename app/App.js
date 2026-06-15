@@ -13,10 +13,16 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 // --- SAJÁT IMPORTOK ---
 import BotNav from "../components/botNav";
+import { initLogger } from "../lib/logger";
 import { supabase } from "../lib/supabase";
+import AddTireScreen from "../screens/AddTireScreen";
+import AdminDashboardScreen from "../screens/AdminDashboardScreen";
+import EmployeesScreen from "../screens/EmployeesScreen";
 import SignInScreen from "../screens/SigninScreen";
 import SignUpScreen from "../screens/SignupScreen";
 import TiresScreen from "../screens/TiresScreen";
+import TireWarehouseScreen from "../screens/TireWarehouseScreen";
+import TruckScreen from "../screens/TruckScreen";
 const Stack = createStackNavigator();
 
 const { LightTheme } = adaptNavigationTheme({
@@ -41,6 +47,9 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Teszt-hibajelentő inicializálása (csak nem-produkciós csatornán aktív)
+    initLogger();
+
     // Kezdeti munkamenet ellenőrzése
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -97,6 +106,31 @@ const App = () => {
               <Stack.Screen
                 name="Tires"
                 component={TiresScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="AddTire"
+                component={AddTireScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="TireWarehouse"
+                component={TireWarehouseScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="AdminDashboard"
+                component={AdminDashboardScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="VehiclesManage"
+                component={TruckScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="PeopleManage"
+                component={EmployeesScreen}
                 options={{ headerShown: false }}
               />
             </>

@@ -1,6 +1,7 @@
 export const ENUM_LABELS = {
   hu: {
     user_role: {
+      owner: "Tulajdonos",
       admin: "Adminisztrátor",
       driver: "Sofőr",
       manager: "Telephelyvezető",
@@ -26,6 +27,7 @@ export const ENUM_LABELS = {
   },
   en: {
     user_role: {
+      owner: "Owner",
       admin: "Administrator",
       driver: "Driver",
       manager: "Manager",

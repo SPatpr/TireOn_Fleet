@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // API importok
+import { getCompanySettings } from "../api/companyAPI";
 import { getEmployees } from "../api/employee";
 import { getProfile } from "../api/profileApi";
 import { createVehicle, getVehicles, updateVehicle } from "../api/truckAPI";
@@ -19,10 +21,14 @@ import { createVehicle, getVehicles, updateVehicle } from "../api/truckAPI";
 import AddTruckModal from "../components/AddTruckModal";
 import EditVehicleModal from "../components/EditVehicleModal";
 import TruckListItem from "../components/TruckListItem";
+import { canAddVehicle, canViewWarehouse, DEFAULT_COMPANY_SETTINGS, isDriver } from "../lib/permissions";
 
-const TruckScreen = ({ navigation }) => {
+const TruckScreen = ({ navigation, route }) => {
+  const fromAdmin = route?.params?.fromAdmin ?? false; // Admin Központból nyílt-e
   // --- JOGOSULTSÁG ÁLLAPOTOK ---
   const [userRole, setUserRole] = useState(null);
+  const [companyId, setCompanyId] = useState(null);
+  const [settings, setSettings] = useState(DEFAULT_COMPANY_SETTINGS);
   const [authLoading, setAuthLoading] = useState(true);
 
   // --- ADAT ÁLLAPOTOK ---
@@ -44,6 +50,12 @@ const TruckScreen = ({ navigation }) => {
 
         if (profile) {
           setUserRole(profile.role);
+          setCompanyId(profile.company_id);
+
+          // Cég jogosultság-mátrixa (gombok mutatása/elrejtése)
+          getCompanySettings(profile.company_id)
+            .then(setSettings)
+            .catch(() => {});
 
           // Ha admin vagy manager, a sofőröket is le kell töltenünk a kapcsolati listához
           if (profile.role === "admin" || profile.role === "manager") {
@@ -86,9 +98,19 @@ const TruckScreen = ({ navigation }) => {
 
   // --- 3. MŰVELETEK (MŰKÖDŐ FUNKCIÓK) ---
 
-  // Kártyára kattintás: megnyitja az edit modalt
+  // Kártyára kattintás:
+  //  - Sofőr: a kerekek CSAK OLVASHATÓ nézete nyílik meg (nincs szerkesztés)
+  //  - Admin/Manager/Owner: szerkesztő modal
   const handleOpenEdit = (vehicle) => {
-    if (userRole === "driver") return; // Sofőröknek nem nyílik meg
+    if (isDriver(userRole)) {
+      navigation?.navigate("Tires", {
+        vehicleId: vehicle.id,
+        plateNumber: vehicle.plate_number,
+        vehicleType: vehicle.type,
+        readOnly: true,
+      });
+      return;
+    }
     setSelectedVehicle(vehicle);
     setEditModalVisible(true);
   };
@@ -122,6 +144,14 @@ const TruckScreen = ({ navigation }) => {
     }
   };
 
+  // Raktár kezelése – a cég gumiabroncs-raktára (company_id biztonságos átadása)
+  const handleNavigateToWarehouse = () => {
+    navigation?.navigate("TireWarehouse", { companyId });
+  };
+
+  const showWarehouseButton = canViewWarehouse(userRole, settings);
+  const showAddVehicleButton = canAddVehicle(userRole, settings);
+
   // Kerekek kezelése gomb átirányítása
   const handleNavigateToTires = (vehicle) => {
     setEditModalVisible(false);
@@ -130,6 +160,7 @@ const TruckScreen = ({ navigation }) => {
       navigation.navigate("Tires", {
         vehicleId: vehicle.id,
         plateNumber: vehicle.plate_number,
+        vehicleType: vehicle.type,
       });
     } else {
       console.log("Navigáció nincs bekötve, a jármű:", vehicle.plate_number);
@@ -152,11 +183,36 @@ const TruckScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Flotta</Text>
-        <Text style={styles.headerSubtitle}>
-          Járművek és sofőr hozzárendelések
-        </Text>
+        {fromAdmin && (
+          <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.headerBackBtn}>
+            <MaterialCommunityIcons name="chevron-left" size={32} color="white" />
+          </TouchableOpacity>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Flotta</Text>
+          <Text style={styles.headerSubtitle}>
+            Járművek és sofőr hozzárendelések
+          </Text>
+        </View>
       </View>
+
+      {/* RAKTÁR KEZELÉSE GOMB – a jogosultság-mátrix szerint */}
+      {showWarehouseButton && (
+        <TouchableOpacity
+          style={styles.warehouseButton}
+          activeOpacity={0.85}
+          onPress={handleNavigateToWarehouse}
+        >
+          <View style={styles.warehouseIconBox}>
+            <MaterialCommunityIcons name="warehouse" size={22} color="#39e6ff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.warehouseButtonTitle}>Raktár kezelése</Text>
+            <Text style={styles.warehouseButtonSub}>Szabad abroncsok és bevételezés</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color="#64748b" />
+        </TouchableOpacity>
+      )}
 
       {/* JÁRMŰ FLUID LISTA */}
       {vehiclesLoading ? (
@@ -186,8 +242,8 @@ const TruckScreen = ({ navigation }) => {
         />
       )}
 
-      {/* RE-STYLING: PRÉMIUM JÁRMŰ HOZZÁADÁSA GOMB (Stílusos pala-kék) */}
-      {(userRole === "admin" || userRole === "manager") && (
+      {/* PRÉMIUM JÁRMŰ HOZZÁADÁSA GOMB – a jogosultság-mátrix szerint */}
+      {showAddVehicleButton && (
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.addButton}
@@ -221,9 +277,45 @@ const TruckScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0A2342" },
   centerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { paddingHorizontal: 24, paddingTop: 15, marginBottom: 10 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 15,
+    marginBottom: 10,
+  },
+  headerBackBtn: { marginRight: 6, marginLeft: -8 },
   headerTitle: { fontSize: 26, fontWeight: "bold", color: "white" },
   headerSubtitle: { fontSize: 14, color: "#94a3b8", marginTop: 4 },
+  warehouseButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginHorizontal: 24,
+    marginBottom: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#0f1c33",
+    borderWidth: 1,
+    borderColor: "rgba(57,230,255,0.25)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  warehouseIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(57,230,255,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(57,230,255,0.25)",
+  },
+  warehouseButtonTitle: { color: "white", fontSize: 16, fontWeight: "700", letterSpacing: 0.3 },
+  warehouseButtonSub: { color: "#64748b", fontSize: 12, marginTop: 2 },
   listContent: { paddingHorizontal: 24, paddingBottom: 120 },
   emptyText: { color: "#94a3b8", fontSize: 16 },
   footer: {
