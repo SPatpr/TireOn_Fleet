@@ -24,7 +24,7 @@ import EmployeesScreen from "../screens/EmployeesScreen";
 import OwnerSettingsScreen from "../screens/OwnerSettingsScreen";
 import SignInScreen from "../screens/SigninScreen";
 import SignUpScreen from "../screens/SignupScreen";
-import TiresScreen from "../screens/TiresScreen";
+import TiresScreen from "../screens/tires/TiresScreen";
 import TireWarehouseScreen from "../screens/TireWarehouseScreen";
 import TruckScreen from "../screens/TruckScreen";
 const Stack = createStackNavigator();

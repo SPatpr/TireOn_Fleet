@@ -107,6 +107,7 @@ const TruckScreen = ({ navigation, route }) => {
         vehicleId: vehicle.id,
         plateNumber: vehicle.plate_number,
         vehicleType: vehicle.type,
+        model: [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || null,
         readOnly: true,
       });
       return;
@@ -161,6 +162,7 @@ const TruckScreen = ({ navigation, route }) => {
         vehicleId: vehicle.id,
         plateNumber: vehicle.plate_number,
         vehicleType: vehicle.type,
+        model: [vehicle.brand, vehicle.model].filter(Boolean).join(" ") || null,
       });
     } else {
       console.log("Navigáció nincs bekötve, a jármű:", vehicle.plate_number);

@@ -39,7 +39,8 @@ import { DEFAULT_TIRE_LIMITS, validateTireValues } from "../lib/tireLimits";
 // Konstansok
 // ─────────────────────────────────────────────────────────────
 
-const POSITIONS = [
+// Kamion (6 kerék) vs. pótkocsi (4 kerék) pozíció-rács
+const TRUCK_POSITIONS = [
   { id: "FL",  label: "Bal\nElső" },
   { id: "FR",  label: "Jobb\nElső" },
   { id: "RL1", label: "Bal H.\nBelső" },
@@ -47,6 +48,16 @@ const POSITIONS = [
   { id: "RR1", label: "Jobb H.\nBelső" },
   { id: "RR2", label: "Jobb H.\nKülső" },
 ];
+
+const TRAILER_POSITIONS = [
+  { id: "TL1", label: "Bal\nElső Pót" },
+  { id: "TR1", label: "Jobb\nElső Pót" },
+  { id: "TL2", label: "Bal\nHátsó Pót" },
+  { id: "TR2", label: "Jobb\nHátsó Pót" },
+];
+
+const getPositionsFor = (vehicleType) =>
+  (vehicleType ?? "").startsWith("trailer") ? TRAILER_POSITIONS : TRUCK_POSITIONS;
 
 const BRANDS = [
   "Michelin", "Continental", "Bridgestone",
@@ -68,6 +79,8 @@ const AddTireScreen = ({ navigation, route }) => {
   const vehicleId   = route?.params?.vehicleId   ?? null;
   const plateNumber = route?.params?.plateNumber ?? "Ismeretlen";
   const initPos     = route?.params?.position    ?? null;
+  const vehicleType = route?.params?.vehicleType ?? null;
+  const POSITIONS   = getPositionsFor(vehicleType);
 
   // Form state
   const [position,     setPosition]     = useState(initPos);
