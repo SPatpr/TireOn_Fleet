@@ -1,4 +1,7 @@
-import { DefaultTheme as NavigationDefaultTheme } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  DefaultTheme as NavigationDefaultTheme,
+} from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import * as NavigationBar from "expo-navigation-bar";
 import { useEffect, useState } from "react";
@@ -98,6 +101,7 @@ const App = () => {
   return (
     <SafeAreaProvider>
       <PaperProvider theme={FinalTheme}>
+        <NavigationContainer theme={LightTheme}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {session && session.user ? (
             // Ha be van jelentkezve -> Alsó menüs főoldal
@@ -141,6 +145,7 @@ const App = () => {
             </>
           )}
         </Stack.Navigator>
+        </NavigationContainer>
       </PaperProvider>
     </SafeAreaProvider>
   );
