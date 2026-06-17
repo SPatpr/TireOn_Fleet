@@ -7,7 +7,6 @@ import { supabase } from "../lib/supabase";
 
 import EmployeesScreen from "../screens/EmployeesScreen";
 import HomeScreen from "../screens/HomeScreen";
-import OwnerSettingsScreen from "../screens/OwnerSettingsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import TruckScreen from "../screens/TruckScreen";
 
@@ -71,8 +70,6 @@ const BotNav = () => {
             iconName = focused ? "people" : "people-outline";
           } else if (route.name === "My Truck") {
             iconName = focused ? "bus" : "bus-outline";
-          } else if (route.name === "Owner") {
-            iconName = focused ? "shield-checkmark" : "shield-checkmark-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
           }
@@ -97,8 +94,8 @@ const BotNav = () => {
         options={{ tabBarLabel: "Főoldal" }}
       />
 
-      {/* FELTÉTELES MEGJELENÍTÉS: Csak admin vagy manager látja */}
-      {(userRole === "admin" || userRole === "manager") && (
+      {/* FELTÉTELES: a Személyzet a cégvezetésnek (admin/manager/owner) */}
+      {["admin", "manager", "owner"].includes(userRole) && (
         <Tab.Screen
           name="Employees"
           component={EmployeesScreen}
@@ -111,15 +108,6 @@ const BotNav = () => {
         component={TruckScreen}
         options={{ tabBarLabel: "Flotta" }}
       />
-
-      {/* TULAJDONOSI VEZÉRLŐPULT: kizárólag az owner látja */}
-      {userRole === "owner" && (
-        <Tab.Screen
-          name="Owner"
-          component={OwnerSettingsScreen}
-          options={{ tabBarLabel: "Tulajdonos" }}
-        />
-      )}
 
       <Tab.Screen
         name="Profile"

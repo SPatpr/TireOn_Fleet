@@ -21,6 +21,7 @@ import { supabase } from "../lib/supabase";
 import AddTireScreen from "../screens/AddTireScreen";
 import AdminDashboardScreen from "../screens/AdminDashboardScreen";
 import EmployeesScreen from "../screens/EmployeesScreen";
+import OwnerSettingsScreen from "../screens/OwnerSettingsScreen";
 import SignInScreen from "../screens/SigninScreen";
 import SignUpScreen from "../screens/SignupScreen";
 import TiresScreen from "../screens/TiresScreen";
@@ -135,6 +136,11 @@ const App = () => {
               <Stack.Screen
                 name="PeopleManage"
                 component={EmployeesScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="OwnerSettings"
+                component={OwnerSettingsScreen}
                 options={{ headerShown: false }}
               />
             </>

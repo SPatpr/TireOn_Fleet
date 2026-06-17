@@ -36,6 +36,7 @@ const AdminDashboardScreen = ({ navigation }) => {
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
   const [companyId, setCompanyId] = useState(null);
+  const [role, setRole] = useState(null);
   const [counts, setCounts] = useState({ vehicles: 0, warehouse: 0, drivers: 0, management: 0 });
   const [countsLoading, setCountsLoading] = useState(true);
 
@@ -56,6 +57,7 @@ const AdminDashboardScreen = ({ navigation }) => {
           }
           setAllowed(true);
           setCompanyId(profile.company_id);
+          setRole(profile.role);
           setChecking(false);
           setCountsLoading(true);
           const c = await getAdminCounts(profile.company_id);
@@ -107,6 +109,18 @@ const AdminDashboardScreen = ({ navigation }) => {
       unit: "fő",
       onPress: () => navigation?.navigate("PeopleManage", { roleScope: "management" }),
     },
+    // Tulajdonosi jogosultság-mátrix – kizárólag owner
+    ...(role === "owner"
+      ? [{
+          key: "owner",
+          icon: "shield-key",
+          title: "Jogosultságok",
+          desc: "Cég-szintű jogosultsági mátrix (tulajdonos)",
+          count: null,
+          unit: "",
+          onPress: () => navigation?.navigate("OwnerSettings"),
+        }]
+      : []),
   ];
 
   if (checking) {
@@ -151,13 +165,15 @@ const AdminDashboardScreen = ({ navigation }) => {
             <View style={{ flex: 1 }}>
               <View style={styles.titleRow}>
                 <Text style={styles.cardTitle}>{s.title}</Text>
-                <View style={styles.countPill}>
-                  {countsLoading ? (
-                    <ActivityIndicator size="small" color="#0A2342" />
-                  ) : (
-                    <Text style={styles.countPillText}>{s.count} {s.unit}</Text>
-                  )}
-                </View>
+                {s.count != null && (
+                  <View style={styles.countPill}>
+                    {countsLoading ? (
+                      <ActivityIndicator size="small" color="#0A2342" />
+                    ) : (
+                      <Text style={styles.countPillText}>{s.count} {s.unit}</Text>
+                    )}
+                  </View>
+                )}
               </View>
               <Text style={styles.cardDesc}>{s.desc}</Text>
             </View>

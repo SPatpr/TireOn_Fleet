@@ -15,7 +15,7 @@
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";       // OPCIÓ A – már telepítve
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -31,7 +31,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { addNewTire, uploadTirePhoto } from "../api/tireAPI";
-import { getLimitsForVehicleType } from "../api/tireSpecAPI";
 import BarcodeScannerModal from "../components/BarcodeScannerModal"; // OPCIÓ B
 import OCRCameraModal from "../components/OCRCameraModal";           // OPCIÓ C
 import { DEFAULT_TIRE_LIMITS, validateTireValues } from "../lib/tireLimits";
@@ -69,10 +68,6 @@ const AddTireScreen = ({ navigation, route }) => {
   const vehicleId   = route?.params?.vehicleId   ?? null;
   const plateNumber = route?.params?.plateNumber ?? "Ismeretlen";
   const initPos     = route?.params?.position    ?? null;
-  const vehicleType = route?.params?.vehicleType ?? null;
-
-  // Járműtípus-specifikus határértékek (validációhoz)
-  const [limits, setLimits] = useState(DEFAULT_TIRE_LIMITS);
 
   // Form state
   const [position,     setPosition]     = useState(initPos);
@@ -102,15 +97,6 @@ const AddTireScreen = ({ navigation, route }) => {
   const [showBrands,    setShowBrands]    = useState(false);
   const [showSizes,     setShowSizes]     = useState(false);
   const scrollRef = useRef(null);
-
-  // Járműtípus határértékeinek betöltése (validációhoz)
-  useEffect(() => {
-    let active = true;
-    getLimitsForVehicleType(vehicleType)
-      .then((l) => { if (active) setLimits(l); })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [vehicleType]);
 
   // ──────────────────────────────────────────────────────────
   // OPCIÓ A – Egyszerű fotókészítés / képtár
@@ -204,10 +190,10 @@ const AddTireScreen = ({ navigation, route }) => {
       return;
     }
 
-    // Kliensoldali tartomány-validáció (a járműtípus limitjei alapján)
+    // Kliensoldali biztonsági tartomány-validáció (fix dev-limitek)
     const { valid, errors } = validateTireValues(
       { pressureBar, treadMm },
-      limits,
+      DEFAULT_TIRE_LIMITS,
     );
     if (!valid) {
       Alert.alert("Érvénytelen érték", errors.pressure || errors.tread);

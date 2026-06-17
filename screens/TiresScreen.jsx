@@ -9,10 +9,10 @@ import {
   mountStockTire,
   updateTireData,
 } from "../api/tireAPI";
-import { getLimitsForVehicleType } from "../api/tireSpecAPI";
 import EmptyTireActionModal from "../components/EmptyTireActionModal";
 import TireStatsModal from "../components/TireStatsModal";
 import WarehouseTireModal from "../components/WarehouseTireModal";
+import { getTireStatusFromValue } from "../constants/tireConfig";
 import { DEFAULT_TIRE_LIMITS } from "../lib/tireLimits";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -81,23 +81,12 @@ const CAPSULE_POSITIONS = {
 };
 
 // Meghatározza a gumi megjelenítési státuszát az aktív mód alapján.
-// Üres pozíció (nincs gumi) → "empty" (szürke).
-const getTireDisplayStatus = (tire, mode) => {
+// A 3-szintű küszöböket a fejlesztői konfigból (constants/tireConfig.js)
+// olvassa, járműtípusonként. Üres pozíció (nincs gumi) → "empty" (szürke).
+const getTireDisplayStatus = (tire, mode, vehicleType = "default") => {
   if (!tire) return "empty";
-  if (mode === "tread") {
-    // Profilmélység: zöld 10-16 mm, sárga 4-9 mm, piros 4 mm alatt
-    const mm = tire.tread;
-    if (mm == null) return null;
-    if (mm >= 10) return "good";
-    if (mm >= 4)  return "warning";
-    return "critical";
-  }
-  // Nyomás: zöld 8.5-9.5 bar, sárga 7.0-8.4 bar, piros 7.0 bar alatt
-  const bar = tire.pressure;
-  if (bar == null) return null;
-  if (bar >= 8.5 && bar <= 9.5) return "good";
-  if (bar >= 7.0)               return "warning"; // 7.0-8.4 és enyhe túlnyomás
-  return "critical";
+  if (mode === "tread") return getTireStatusFromValue(tire.tread, "mm", vehicleType);
+  return getTireStatusFromValue(tire.pressure, "bar", vehicleType);
 };
 
 // Az aktív mód szerinti kapszula-szöveg
@@ -197,21 +186,10 @@ const TiresScreen = ({ navigation, route }) => {
 
   const plateNumber = route?.params?.plateNumber || "ABC-123";
   const vehicleId = route?.params?.vehicleId ?? null;
-  const vehicleType = route?.params?.vehicleType ?? null;
+  const vehicleType = route?.params?.vehicleType ?? "default";
   const readOnly = route?.params?.readOnly ?? false; // sofőr: csak olvasás
 
-  // Járműtípus-specifikus határértékek (validációhoz)
-  const [limits, setLimits] = useState(DEFAULT_TIRE_LIMITS);
-
   const selectedTire = selectedId ? tires[selectedId] : null;
-
-  useEffect(() => {
-    let active = true;
-    getLimitsForVehicleType(vehicleType)
-      .then((l) => { if (active) setLimits(l); })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [vehicleType]);
 
   const loadTires = useCallback(async () => {
     if (!vehicleId) return;
@@ -256,7 +234,7 @@ const TiresScreen = ({ navigation, route }) => {
 
   const counts = Object.values(tires).reduce(
     (acc, t) => {
-      const ds = getTireDisplayStatus(t, colorMode);
+      const ds = getTireDisplayStatus(t, colorMode, vehicleType);
       if (ds === "good") acc.ok++;
       else if (ds === "warning") acc.warn++;
       else if (ds === "critical") acc.crit++;
@@ -484,14 +462,14 @@ const TiresScreen = ({ navigation, route }) => {
               key={id}
               pos={pos}
               isSelected={selectedId === id}
-              displayStatus={getTireDisplayStatus(tires[id], colorMode)}
+              displayStatus={getTireDisplayStatus(tires[id], colorMode, vehicleType)}
             />
           ))}
 
           {/* ADATKAPSZULÁK – aktív mód szerint bar / mm, státusz színnel */}
           {Object.entries(CAPSULE_POSITIONS).map(([id, cp]) => {
             const tire = tires[id];
-            const ds = getTireDisplayStatus(tire, colorMode);
+            const ds = getTireDisplayStatus(tire, colorMode, vehicleType);
             const s = STATUS[ds] ?? STATUS.unknown;
             return (
               <G key={`cap-${id}`}>
@@ -540,7 +518,7 @@ const TiresScreen = ({ navigation, route }) => {
         tire={selectedTire}
         onSave={handleSave}
         isSaving={isSaving}
-        limits={limits}
+        limits={DEFAULT_TIRE_LIMITS}
         readOnly={readOnly}
       />
 

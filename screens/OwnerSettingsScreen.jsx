@@ -1,15 +1,17 @@
 // =============================================================
-// OwnerSettingsScreen – Tulajdonosi Vezérlőpult
+// OwnerSettingsScreen – Tulajdonosi jogosultság-mátrix
 //
-// CSAK 'owner' szerepkörrel érhető el. Két fő szekció:
-//   1) Jogosultság-mátrix (Switch-ek) → company_settings
-//   2) Járműtípus-specifikus gumi-határértékek → tire_specs
+// CSAK 'owner' szerepkörrel érhető el (a Profil → Cégvezérlés
+// útvonalon keresztül). A tulajdonos itt kapcsolgatja a cég
+// jogosultsági szabályait (company_settings).
 //
-// Védelem: kliensoldalon a nem-owner felhasználót azonnal
-// visszairányítjuk a főoldalra; az íráshoz a Supabase RLS is
-// owner-jogosultságot követel (company_settings_owner_write).
+// A gumiabroncs-határértékek MOSTANTÓL fejlesztői konfigurációból
+// (constants/tireConfig.js) jönnek – itt már NEM szerkeszthetők.
 //
-// Háttér: mély sötétkék/fekete (#050c18); a panelek fehérek.
+// Védelem: a nem-owner felhasználót visszairányítjuk; az íráshoz a
+// Supabase RLS is owner-jogot követel (company_settings_owner_write).
+//
+// Háttér: mély sötétkék/fekete (#050c18); a panel fehér.
 // =============================================================
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -21,15 +23,11 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCompanySettings, updateCompanySettings } from "../api/companyAPI";
 import { getProfile } from "../api/profileApi";
-import { getTireSpecs, upsertTireSpec } from "../api/tireSpecAPI";
-import EditTireSpecModal from "../components/EditTireSpecModal";
-import { ENUM_LABELS } from "../constans.js";
 import { DEFAULT_COMPANY_SETTINGS } from "../lib/permissions";
 
 const DARK = "#050c18";
@@ -55,19 +53,11 @@ const MATRIX = [
   },
 ];
 
-const typeLabel = (t) => ENUM_LABELS.hu.vehicle_type[t] ?? t;
-
 const OwnerSettingsScreen = ({ navigation }) => {
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
-
   const [settings, setSettings] = useState(DEFAULT_COMPANY_SETTINGS);
   const [savingKey, setSavingKey] = useState(null);
-
-  const [specs, setSpecs] = useState([]);
-  const [selectedSpec, setSelectedSpec] = useState(null);
-  const [specModalVisible, setSpecModalVisible] = useState(false);
-  const [specSaving, setSpecSaving] = useState(false);
 
   // --- OWNER-GATE + adatbetöltés ---
   const init = useCallback(async () => {
@@ -78,9 +68,7 @@ const OwnerSettingsScreen = ({ navigation }) => {
         return;
       }
       setAllowed(true);
-      const [s, sp] = await Promise.all([getCompanySettings(), getTireSpecs()]);
-      setSettings(s);
-      setSpecs(sp);
+      setSettings(await getCompanySettings());
     } catch (err) {
       console.error("Owner init error:", err.message);
       setAllowed(false);
@@ -93,14 +81,13 @@ const OwnerSettingsScreen = ({ navigation }) => {
     init();
   }, [init]);
 
-  // Nem-owner → vissza a főoldalra
+  // Nem-owner → vissza
   useEffect(() => {
     if (!checking && !allowed) {
-      navigation?.navigate?.("Home");
+      navigation?.goBack?.();
     }
   }, [checking, allowed, navigation]);
 
-  // --- Mátrix kapcsoló ---
   const handleToggle = async (key, value) => {
     const prev = settings;
     setSettings((s) => ({ ...s, [key]: value })); // optimista
@@ -113,23 +100,6 @@ const OwnerSettingsScreen = ({ navigation }) => {
       Alert.alert("Hiba", err.message || "Nem sikerült menteni a beállítást.");
     } finally {
       setSavingKey(null);
-    }
-  };
-
-  // --- Gumi-határérték szerkesztés ---
-  const handleSaveSpec = async (values) => {
-    setSpecSaving(true);
-    try {
-      const saved = await upsertTireSpec(values);
-      setSpecs((prev) =>
-        prev.map((s) => (s.vehicle_type === saved.vehicle_type ? { ...s, ...saved } : s)),
-      );
-      setSpecModalVisible(false);
-      setSelectedSpec(null);
-    } catch (err) {
-      Alert.alert("Mentési hiba", err.message || "Ismeretlen hiba történt.");
-    } finally {
-      setSpecSaving(false);
     }
   };
 
@@ -158,13 +128,12 @@ const OwnerSettingsScreen = ({ navigation }) => {
           <MaterialCommunityIcons name="crown" size={22} color="#0A2342" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Tulajdonosi vezérlőpult</Text>
-          <Text style={styles.headerSubtitle}>Jogosultságok és globális limitek</Text>
+          <Text style={styles.headerTitle}>Jogosultságok</Text>
+          <Text style={styles.headerSubtitle}>Tulajdonosi beállítások</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* JOGOSULTSÁG-MÁTRIX */}
         <Text style={styles.sectionLabel}>Jogosultság-mátrix</Text>
         <View style={styles.panel}>
           {MATRIX.map((item, idx) => (
@@ -193,49 +162,8 @@ const OwnerSettingsScreen = ({ navigation }) => {
             </View>
           ))}
         </View>
-
-        {/* GUMI-HATÁRÉRTÉKEK */}
-        <Text style={styles.sectionLabel}>Gumi-határértékek (járműtípusonként)</Text>
-        <Text style={styles.sectionHint}>
-          A megadott min/max nyomás és profilmélység alapján a rendszer megakadályozza
-          a veszélyes vagy irreális értékek mentését az egész cégben.
-        </Text>
-        <View style={styles.panel}>
-          {specs.map((spec, idx) => (
-            <TouchableOpacity
-              key={spec.vehicle_type}
-              style={[styles.specRow, idx < specs.length - 1 && styles.matrixDivider]}
-              activeOpacity={0.7}
-              onPress={() => { setSelectedSpec(spec); setSpecModalVisible(true); }}
-            >
-              <View style={styles.matrixIcon}>
-                <MaterialCommunityIcons name="tire" size={20} color="#0A2342" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.matrixTitle}>{typeLabel(spec.vehicle_type)}</Text>
-                <Text style={styles.specMeta}>
-                  {spec.min_bar}–{spec.max_bar} bar · {spec.min_mm}–{spec.max_mm} mm
-                </Text>
-              </View>
-              <MaterialCommunityIcons name="pencil" size={20} color="#475569" />
-            </TouchableOpacity>
-          ))}
-          {specs.length === 0 && (
-            <Text style={styles.emptyText}>Nincsenek beállított járműtípusok.</Text>
-          )}
-        </View>
-
         <View style={{ height: 24 }} />
       </ScrollView>
-
-      <EditTireSpecModal
-        visible={specModalVisible}
-        spec={selectedSpec}
-        typeLabel={selectedSpec ? typeLabel(selectedSpec.vehicle_type) : ""}
-        onClose={() => { setSpecModalVisible(false); setSelectedSpec(null); }}
-        onSave={handleSaveSpec}
-        isSaving={specSaving}
-      />
     </SafeAreaView>
   );
 };
@@ -280,8 +208,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 4,
   },
-  sectionHint: { color: "#64748b", fontSize: 12, lineHeight: 17, marginBottom: 10, marginLeft: 4 },
-
   panel: {
     backgroundColor: "#ffffff",
     borderRadius: 18,
@@ -293,7 +219,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   matrixRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 16 },
-  specRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 16 },
   matrixDivider: { borderBottomWidth: 1, borderBottomColor: "#eef2f7" },
   matrixIcon: {
     width: 40,
@@ -305,6 +230,4 @@ const styles = StyleSheet.create({
   },
   matrixTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
   matrixDesc: { fontSize: 12, color: "#64748b", marginTop: 2, lineHeight: 16 },
-  specMeta: { fontSize: 13, color: "#334155", fontWeight: "700", marginTop: 3 },
-  emptyText: { color: "#64748b", fontSize: 14, paddingVertical: 18, textAlign: "center" },
 });
