@@ -40,10 +40,18 @@ jobs:
         run: npm ci
 
       - name: 📲 OTA frissítés publikálása a preview csatornára
-        run: eas update --branch preview --message "${{ github.event.head_commit.message }}" --non-interactive
+        run: |
+          # A commit-üzenetből CSAK az első sort (subject) használjuk üzenetként.
+          # Env-változón át adjuk át, hogy a több soros / speciális karakteres
+          # üzenet ne törje szét a parancsot (shell-injection elkerülése).
+          MSG="${COMMIT_MSG%%$'\n'*}"
+          [ -z "$MSG" ] && MSG="$GITHUB_SHA"
+          eas update --branch preview --message "$MSG" --non-interactive
         env:
+          # A commit-üzenet biztonságosan, env-változóként
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
           # A teszt-bundle a TESZT Supabase adatbázist használja
           # (külön a GitHub Secrets-ben tárolva, az élestől elválasztva).
           EXPO_PUBLIC_APP_ENV: preview
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
