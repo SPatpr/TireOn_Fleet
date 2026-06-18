@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getCompanySettings } from "../api/companyAPI";
-import { getEmployees, updateEmployee } from "../api/employee";
+import { deleteEmployee, getEmployees, updateEmployee } from "../api/employee";
 import { getProfile } from "../api/profileApi";
 import AddEmployeeModal from "../components/AddEmployeeModal";
 import EditEmployeeModal from "../components/EditEmployeeModal";
@@ -131,6 +131,20 @@ const EmployeesScreen = ({ navigation, route }) => {
       fetchEmployees(true);
     } catch (error) {
       Alert.alert("Hiba a mentés során", error.message);
+    }
+  };
+
+  const handleDeleteEmployee = async (id) => {
+    try {
+      await deleteEmployee(id);
+      // Azonnali local state frissítés visszaigazolásként
+      setEmployees((prev) => prev.filter((e) => e.id !== id));
+      setEditModalVisible(false);
+      setSelectedEmployee(null);
+      Alert.alert("Törölve", "Az alkalmazott eltávolítva.");
+      fetchEmployees(true);
+    } catch (error) {
+      Alert.alert("Hiba a törlés során", error.message);
     }
   };
 
@@ -277,6 +291,7 @@ const EmployeesScreen = ({ navigation, route }) => {
         employee={selectedEmployee}
         onClose={() => setEditModalVisible(false)}
         onSave={handleUpdateEmployee}
+        onDelete={handleDeleteEmployee}
       />
 
       {/* MEGHÍVÁS MODAL */}

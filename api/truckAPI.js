@@ -171,3 +171,39 @@ export const updateVehicle = async (vehicleId, updateData) => {
     throw error;
   }
 };
+
+// =============================================================
+// JÁRMŰ TÖRLÉSE
+// A vehicles sor törlése. A függőségeket a DB ON DELETE CASCADE kezeli:
+//   tires, driver_vehicles, inspections, tire_history → automatikusan törlődik.
+// =============================================================
+export const deleteVehicle = async (vehicleId) => {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error("Nem vagy bejelentkezve!");
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("company_id, role")
+      .eq("id", user.id)
+      .single();
+    if (profileError || !profile) throw new Error("Profil nem található!");
+    if (!["owner", "admin", "manager"].includes(profile.role))
+      throw new Error("Nincs jogosultságod járművet törölni!");
+
+    const { error } = await supabase
+      .from("vehicles")
+      .delete()
+      .eq("id", vehicleId)
+      .eq("company_id", profile.company_id);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error("deleteVehicle Error:", error.message);
+    throw error;
+  }
+};

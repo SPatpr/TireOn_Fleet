@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -12,9 +13,27 @@ import { Checkbox, IconButton, Text } from "react-native-paper";
 import { ENUM_LABELS } from "../constans";
 
 const STATUS_OPTIONS = [
-  { value: "active",      label: "Aktív",           color: "#16a34a", bg: "rgba(22,163,74,0.10)",  icon: "check-circle-outline" },
-  { value: "maintenance", label: "Szervizben",       color: "#d97706", bg: "rgba(217,119,6,0.10)",  icon: "wrench-outline" },
-  { value: "inactive",    label: "Üzemen kívül",     color: "#64748b", bg: "rgba(100,116,139,0.10)", icon: "pause-circle-outline" },
+  {
+    value: "active",
+    label: "Aktív",
+    color: "#16a34a",
+    bg: "rgba(22,163,74,0.10)",
+    icon: "check-circle-outline",
+  },
+  {
+    value: "maintenance",
+    label: "Szervizben",
+    color: "#d97706",
+    bg: "rgba(217,119,6,0.10)",
+    icon: "wrench-outline",
+  },
+  {
+    value: "inactive",
+    label: "Üzemen kívül",
+    color: "#64748b",
+    bg: "rgba(100,116,139,0.10)",
+    icon: "pause-circle-outline",
+  },
 ];
 
 const EditVehicleModal = ({
@@ -23,6 +42,7 @@ const EditVehicleModal = ({
   vehicle,
   drivers = [], // Biztonsági default üres tömb
   onSave,
+  onDelete,
   onNavigateToTires,
 }) => {
   const [status, setStatus] = useState("active");
@@ -65,6 +85,19 @@ const EditVehicleModal = ({
       status: status,
       driverIds: selectedDrivers,
     });
+  };
+
+  // Törlés megerősítő Alerttel
+  const handleDelete = () => {
+    if (!vehicle) return;
+    Alert.alert(
+      "Jármű törlése",
+      `Biztosan törlöd a(z) ${vehicle.plate_number || "jármű"} járművet? A hozzá tartozó kerekek és előzmények is törlődnek. Ez nem vonható vissza.`,
+      [
+        { text: "Mégse", style: "cancel" },
+        { text: "Törlés", style: "destructive", onPress: () => onDelete?.(vehicle.id) },
+      ],
+    );
   };
 
   return (
@@ -131,10 +164,12 @@ const EditVehicleModal = ({
                         size={20}
                         color={isActive ? opt.color : "#94a3b8"}
                       />
-                      <Text style={[
-                        styles.statusButtonText,
-                        { color: isActive ? opt.color : "#94a3b8" },
-                      ]}>
+                      <Text
+                        style={[
+                          styles.statusButtonText,
+                          { color: isActive ? opt.color : "#94a3b8" },
+                        ]}
+                      >
                         {opt.label}
                       </Text>
                     </TouchableOpacity>
@@ -267,6 +302,16 @@ const EditVehicleModal = ({
               onPress={handleSave}
             >
               <Text style={styles.saveBtnText}>Változtatások mentése</Text>
+            </TouchableOpacity>
+
+            {/* JÁRMŰ TÖRLÉSE */}
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              activeOpacity={0.8}
+              onPress={handleDelete}
+            >
+              <MaterialCommunityIcons name="trash-can-outline" size={18} color="#ef4444" />
+              <Text style={styles.deleteBtnText}>Jármű törlése</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -460,7 +505,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f1f5f9",
   },
   checkboxRowSelected: {
-    backgroundColor: "#f0fdf4", // Halványzöld háttér a kijelölt soroknak
+    backgroundColor: "#f0fdf4",
   },
   driverNameText: {
     fontSize: 16,
@@ -507,6 +552,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    width: "100%",
+    height: 50,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    borderColor: "#ef4444",
+    backgroundColor: "rgba(239,68,68,0.06)",
+    marginTop: 12,
+  },
+  deleteBtnText: { color: "#ef4444", fontSize: 16, fontWeight: "700" },
 });
 
 export default EditVehicleModal;

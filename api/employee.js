@@ -44,10 +44,13 @@ export const getEmployees = async () => {
       throw new Error("Nincs cég rendelve ehhez a fiókhoz!");
     }
 
-    // 3. Az összes alkalmazott lekérése, akik ugyanahhoz a céghez tartoznak
+    // 3. Az összes alkalmazott + a hozzárendelt jármű (Many-to-Many a
+    //    driver_vehicles kapcsolótáblán keresztül: rendszám + típus).
     const { data: employees, error: employeesError } = await supabase
       .from("profiles")
-      .select("*")
+      .select(
+        "*, driver_vehicles(vehicle_id, vehicles(id, plate_number, type, model))"
+      )
       .eq("company_id", profile.company_id)
       .order("full_name", { ascending: true });
 
@@ -101,4 +104,43 @@ export const updateEmployee = async (id, updateData) => {
     throw error;
   }
   return data;
+};
+
+// =============================================================
+// ALKALMAZOTT TÖRLÉSE
+// A profiles sor törlése. A függőségeket a DB kezeli:
+//   • driver_vehicles → ON DELETE CASCADE
+//   • inspections / tire_history / pending_invitations → ON DELETE SET NULL
+// (Az auth.users sor megmarad – teljes törléshez service-role Edge Function kell.)
+// =============================================================
+export const deleteEmployee = async (id) => {
+  if (!id) throw new Error("Hiányzó alkalmazott azonosító!");
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error("Nem vagy bejelentkezve!");
+  if (id === user.id) throw new Error("Saját magadat nem törölheted!");
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("company_id, role")
+    .eq("id", user.id)
+    .single();
+  if (profileError || !profile) throw new Error("Profil nem található!");
+  if (!["owner", "admin", "manager"].includes(profile.role))
+    throw new Error("Nincs jogosultságod alkalmazottat törölni!");
+
+  const { error } = await supabase
+    .from("profiles")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
+
+  if (error) {
+    console.error("deleteEmployee Error:", error.message);
+    throw error;
+  }
+  return { success: true };
 };

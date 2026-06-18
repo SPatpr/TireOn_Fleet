@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getCompanySettings } from "../api/companyAPI";
 import { getEmployees } from "../api/employee";
 import { getProfile } from "../api/profileApi";
-import { createVehicle, getVehicles, updateVehicle } from "../api/truckAPI";
+import { createVehicle, deleteVehicle, getVehicles, updateVehicle } from "../api/truckAPI";
 
 // Komponens importok
 import AddTruckModal from "../components/AddTruckModal";
@@ -146,6 +146,20 @@ const TruckScreen = ({ navigation, route }) => {
     }
   };
 
+  // Jármű törlése (megerősítés a modalban történik)
+  const handleDeleteVehicle = async (vehicleId) => {
+    try {
+      await deleteVehicle(vehicleId);
+      setVehicles((prev) => prev.filter((v) => v.id !== vehicleId));
+      setEditModalVisible(false);
+      setSelectedVehicle(null);
+      Alert.alert("Törölve", "A jármű eltávolítva.");
+      loadVehicles();
+    } catch (error) {
+      Alert.alert("Hiba a törlés során", error.message);
+    }
+  };
+
   // Raktár kezelése – a cég gumiabroncs-raktára (company_id biztonságos átadása)
   const handleNavigateToWarehouse = () => {
     navigation?.navigate("TireWarehouse", { companyId });
@@ -267,6 +281,7 @@ const TruckScreen = ({ navigation, route }) => {
         drivers={drivers} // Átadva a szűrt, valós sofőrök listája az adatbázisból!
         onClose={() => setEditModalVisible(false)}
         onSave={handleSaveVehicle} // Éles mentés bekötve
+        onDelete={handleDeleteVehicle} // Törlés bekötve
         onNavigateToTires={handleNavigateToTires} // Kerekek kezelése bekötve
       />
 

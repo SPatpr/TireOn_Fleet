@@ -2,6 +2,7 @@ import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import { useEffect, useState } from "react";
 import {
+    Alert,
     Image,
     Modal,
     ScrollView,
@@ -24,7 +25,12 @@ const getAssignedVehicle = (employee) => {
   return null;
 };
 
-const EditEmployeeModal = ({ visible, onClose, employee, onSave }) => {
+// Járműtípus → ikon / magyar felirat
+const typeIcon = (type) =>
+  type === "car" ? "car" : (type ?? "").startsWith("trailer") ? "truck-trailer" : "truck";
+const typeLabel = (type) => ENUM_LABELS.hu.vehicle_type[type] || type || "Ismeretlen";
+
+const EditEmployeeModal = ({ visible, onClose, employee, onSave, onDelete }) => {
   const [formData, setFormData] = useState({
     phone_number: "",
     role: "",
@@ -49,6 +55,19 @@ const EditEmployeeModal = ({ visible, onClose, employee, onSave }) => {
       phone_number: formData.phone_number,
       role: formData.role,
     });
+  };
+
+  // Törlés megerősítő Alerttel
+  const handleDelete = () => {
+    if (!employee) return;
+    Alert.alert(
+      "Alkalmazott törlése",
+      `Biztosan törlöd: ${employee.full_name || "ez az alkalmazott"}? Ez a művelet nem vonható vissza.`,
+      [
+        { text: "Mégse", style: "cancel" },
+        { text: "Törlés", style: "destructive", onPress: () => onDelete?.(employee.id) },
+      ],
+    );
   };
 
   return (
@@ -143,11 +162,19 @@ const EditEmployeeModal = ({ visible, onClose, employee, onSave }) => {
                 const truck = getAssignedVehicle(employee);
                 if (truck?.model || truck?.plate_number) {
                   return (
-                    <View style={styles.truckRow}>
-                      <MaterialCommunityIcons name="truck" size={24} color="#0A2342" />
-                      <Text style={styles.truckText}>
-                        {truck.model || "Ismeretlen típus"} ({truck.plate_number || truck.plate || "Nincs rendszám"})
-                      </Text>
+                    <View style={styles.truckCard}>
+                      <View style={styles.truckIconBox}>
+                        <MaterialCommunityIcons name={typeIcon(truck.type)} size={24} color="#0A2342" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.truckPlate}>
+                          {truck.plate_number || truck.plate || "Nincs rendszám"}
+                        </Text>
+                        <Text style={styles.truckMeta}>
+                          {typeLabel(truck.type)}
+                          {truck.model ? ` · ${truck.model}` : ""}
+                        </Text>
+                      </View>
                     </View>
                   );
                 }
@@ -161,6 +188,12 @@ const EditEmployeeModal = ({ visible, onClose, employee, onSave }) => {
             {/* MENTÉS GOMB */}
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
               <Text style={styles.saveBtnText}>Mentés</Text>
+            </TouchableOpacity>
+
+            {/* ALKALMAZOTT TÖRLÉSE */}
+            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} activeOpacity={0.8}>
+              <MaterialCommunityIcons name="trash-can-outline" size={18} color="#ef4444" />
+              <Text style={styles.deleteBtnText}>Alkalmazott törlése</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -278,22 +311,30 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
   },
-  truckRow: {
+  truckCard: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
     marginTop: 15,
-    justifyContent: "center",
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "white",
     padding: 12,
     borderRadius: 14,
     width: "100%",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
-  truckText: {
-    marginLeft: 10,
-    fontSize: 15,
-    color: "#0A2342",
-    fontWeight: "600",
+  truckIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
+  truckPlate: { fontSize: 16, fontWeight: "800", color: "#0f172a", letterSpacing: 0.5 },
+  truckMeta: { fontSize: 13, color: "#64748b", marginTop: 2 },
   noTruckText: {
     textAlign: "center",
     marginTop: 15,
@@ -315,6 +356,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    width: "100%",
+    height: 50,
+    borderRadius: 15,
+    borderWidth: 1.5,
+    borderColor: "#ef4444",
+    backgroundColor: "rgba(239,68,68,0.06)",
+    marginTop: 12,
+  },
+  deleteBtnText: { color: "#ef4444", fontSize: 16, fontWeight: "700" },
 });
 
 export default EditEmployeeModal;
