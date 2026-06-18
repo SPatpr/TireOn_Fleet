@@ -20,6 +20,13 @@ const TYPE_OPTIONS = [
   { value: "car",     label: "Személyautó" },
 ];
 
+// Pótkocsi tengelyszám-opciók
+const AXLE_OPTIONS = [
+  { value: 1, label: "1 tengely" },
+  { value: 2, label: "2 tengely (tandem)" },
+  { value: 3, label: "3 tengely (tridem)" },
+];
+
 const AddTruckModal = ({ visible, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     plate_number: "",
@@ -27,6 +34,7 @@ const AddTruckModal = ({ visible, onClose, onSave }) => {
     brand: "",
     model: "",
     type: "truck", // ÉRVÉNYES enum-alapérték (korábban "tractor" → INSERT hiba)
+    axle_count: 2, // csak pótkocsinál releváns
     current_km: "",
     status: "active",
   });
@@ -39,6 +47,8 @@ const AddTruckModal = ({ visible, onClose, onSave }) => {
     const dataToSave = {
       ...formData,
       current_km: parseInt(formData.current_km) || 0,
+      // axle_count csak pótkocsinál mentődik, egyébként NULL
+      axle_count: formData.type === "trailer" ? Number(formData.axle_count) : null,
     };
     await onSave(dataToSave);
     // onClose a szülő (TruckScreen) hívja sikeres mentés után
@@ -128,6 +138,24 @@ const AddTruckModal = ({ visible, onClose, onSave }) => {
                   </Picker>
                 </View>
               </View>
+
+              {/* TENGELYSZÁM – csak pótkocsinál (kötelező) */}
+              {formData.type === "trailer" && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Tengelyek száma</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={formData.axle_count}
+                      onValueChange={(val) => handleInputChange("axle_count", val)}
+                      style={styles.picker}
+                    >
+                      {AXLE_OPTIONS.map(({ value, label }) => (
+                        <Picker.Item key={value} label={label} value={value} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Aktuális km állás</Text>

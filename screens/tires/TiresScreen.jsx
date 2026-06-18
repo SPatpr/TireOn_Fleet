@@ -12,7 +12,7 @@
 // =============================================================
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -27,9 +27,9 @@ import WarehouseTireModal from "../../components/WarehouseTireModal";
 import { DEFAULT_TIRE_LIMITS } from "../../lib/tireLimits";
 import { ACC, getTireDisplayStatus, STATUS } from "./components/blueprintCore";
 import TrailerBlueprint, {
-  DEMO_TIRES as TRAILER_DEMO,
-  LABELS as TRAILER_LABELS,
-  TYPE_LABEL as TRAILER_TYPE,
+  getTrailerDemo,
+  getTrailerLayout,
+  trailerTypeLabel,
 } from "./components/TrailerBlueprint";
 import TruckBlueprint, {
   DEMO_TIRES as TRUCK_DEMO,
@@ -37,17 +37,10 @@ import TruckBlueprint, {
   TYPE_LABEL as TRUCK_TYPE,
 } from "./components/TruckBlueprint";
 
-// Járműtípus → blueprint konfiguráció (a config-objektumok modul-szintű
-// konstansok, így referenciálisan stabilak).
+// Kamion-konfiguráció statikus; a pótkocsié az axleCount alapján generálódik.
 const TRUCK_CONFIG = {
   Blueprint: TruckBlueprint, labels: TRUCK_LABELS, demo: TRUCK_DEMO, typeLabel: TRUCK_TYPE,
 };
-const TRAILER_CONFIG = {
-  Blueprint: TrailerBlueprint, labels: TRAILER_LABELS, demo: TRAILER_DEMO, typeLabel: TRAILER_TYPE,
-};
-
-const resolveConfig = (vehicleType) =>
-  (vehicleType ?? "").startsWith("trailer") ? TRAILER_CONFIG : TRUCK_CONFIG;
 
 const TiresScreen = ({ navigation, route }) => {
   const plateNumber = route?.params?.plateNumber || "ABC-123";
@@ -55,8 +48,23 @@ const TiresScreen = ({ navigation, route }) => {
   const vehicleType = route?.params?.vehicleType ?? "default";
   const model = route?.params?.model || null;
   const readOnly = route?.params?.readOnly ?? false; // sofőr: csak olvasás
+  const isTrailer = (vehicleType ?? "").startsWith("trailer");
+  const axleCount = isTrailer ? Math.min(3, Math.max(1, Number(route?.params?.axleCount) || 2)) : null;
 
-  const config = resolveConfig(vehicleType);
+  // Pótkocsinál a config (kerékpozíciók, feliratok, demo) a tengelyszámból
+  // generálódik; useMemo tartja stabilan (a loadTires függ tőle).
+  const config = useMemo(() => {
+    if (isTrailer) {
+      const layout = getTrailerLayout(axleCount);
+      return {
+        Blueprint: TrailerBlueprint,
+        labels: layout.labels,
+        demo: getTrailerDemo(axleCount),
+        typeLabel: trailerTypeLabel(axleCount),
+      };
+    }
+    return TRUCK_CONFIG;
+  }, [isTrailer, axleCount]);
   const Blueprint = config.Blueprint;
 
   const [tires, setTires] = useState(config.demo);
@@ -139,7 +147,7 @@ const TiresScreen = ({ navigation, route }) => {
     const pos = emptyPos;
     setChoiceVisible(false);
     setEmptyPos(null);
-    navigation?.navigate("AddTire", { vehicleId, plateNumber, position: pos, vehicleType });
+    navigation?.navigate("AddTire", { vehicleId, plateNumber, position: pos, vehicleType, axleCount });
   };
 
   const handleChooseFromStock = async () => {
@@ -260,6 +268,7 @@ const TiresScreen = ({ navigation, route }) => {
           tires={tires}
           colorMode={colorMode}
           vehicleType={vehicleType}
+          axleCount={axleCount}
           selectedId={selectedId}
           onTirePress={handleTirePress}
         />
@@ -297,7 +306,7 @@ const TiresScreen = ({ navigation, route }) => {
       {!readOnly && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => navigation?.navigate("AddTire", { vehicleId, plateNumber, vehicleType })}
+          onPress={() => navigation?.navigate("AddTire", { vehicleId, plateNumber, vehicleType, axleCount })}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="plus" size={28} color="white" />

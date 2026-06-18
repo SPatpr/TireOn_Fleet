@@ -34,12 +34,13 @@ import { addNewTire, uploadTirePhoto } from "../api/tireAPI";
 import BarcodeScannerModal from "../components/BarcodeScannerModal"; // OPCIÓ B
 import OCRCameraModal from "../components/OCRCameraModal";           // OPCIÓ C
 import { DEFAULT_TIRE_LIMITS, validateTireValues } from "../lib/tireLimits";
+import { getTrailerLayout } from "./tires/components/TrailerBlueprint";
 
 // ─────────────────────────────────────────────────────────────
 // Konstansok
 // ─────────────────────────────────────────────────────────────
 
-// Kamion (6 kerék) vs. pótkocsi (4 kerék) pozíció-rács
+// Kamion pozíció-rács (6 kerék)
 const TRUCK_POSITIONS = [
   { id: "FL",  label: "Bal\nElső" },
   { id: "FR",  label: "Jobb\nElső" },
@@ -49,15 +50,16 @@ const TRUCK_POSITIONS = [
   { id: "RR2", label: "Jobb H.\nKülső" },
 ];
 
-const TRAILER_POSITIONS = [
-  { id: "TL1", label: "Bal\nElső Pót" },
-  { id: "TR1", label: "Jobb\nElső Pót" },
-  { id: "TL2", label: "Bal\nHátsó Pót" },
-  { id: "TR2", label: "Jobb\nHátsó Pót" },
-];
-
-const getPositionsFor = (vehicleType) =>
-  (vehicleType ?? "").startsWith("trailer") ? TRAILER_POSITIONS : TRUCK_POSITIONS;
+// Pótkocsinál a pozíciók a tengelyszámból generálódnak (1/2/3 tengely).
+const getPositionsFor = (vehicleType, axleCount) => {
+  if ((vehicleType ?? "").startsWith("trailer")) {
+    return Object.entries(getTrailerLayout(axleCount).labels).map(([id, label]) => ({
+      id,
+      label: label.replace(" ", "\n"),
+    }));
+  }
+  return TRUCK_POSITIONS;
+};
 
 const BRANDS = [
   "Michelin", "Continental", "Bridgestone",
@@ -80,7 +82,8 @@ const AddTireScreen = ({ navigation, route }) => {
   const plateNumber = route?.params?.plateNumber ?? "Ismeretlen";
   const initPos     = route?.params?.position    ?? null;
   const vehicleType = route?.params?.vehicleType ?? null;
-  const POSITIONS   = getPositionsFor(vehicleType);
+  const axleCount   = route?.params?.axleCount ?? 2;
+  const POSITIONS   = getPositionsFor(vehicleType, axleCount);
 
   // Form state
   const [position,     setPosition]     = useState(initPos);
