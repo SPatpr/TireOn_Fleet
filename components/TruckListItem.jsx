@@ -8,7 +8,17 @@ const STATUS_COLORS = {
   inactive:    "#64748b",
 };
 
-const TruckListItem = ({ brand, model, plate, status, onPress }) => {
+// Járműtípus → MaterialCommunityIcons ikon (a trailer_* legacy is ide esik)
+const typeIcon = (type) => {
+  if (type === "car") return "car";
+  if ((type ?? "").startsWith("trailer")) return "truck-trailer";
+  return "truck";
+};
+
+// Járműtípus → magyar felirat (legacy trailer_1/2/3 is kezelve)
+const typeLabel = (type) => ENUM_LABELS.hu.vehicle_type[type] || type || "Ismeretlen";
+
+const TruckListItem = ({ brand, model, plate, status, type, onPress }) => {
   const translatedStatus = ENUM_LABELS.hu.vehicle_status[status] || status;
   const statusColor = STATUS_COLORS[status] ?? "#dc2626";
 
@@ -20,9 +30,9 @@ const TruckListItem = ({ brand, model, plate, status, onPress }) => {
       activeOpacity={0.85}
       onPress={onPress}
     >
-      {/* IKON: Világos szürkéskék háttér, sötétebb kék ikonnal */}
+      {/* IKON: típus szerint dinamikus (kamion / pótkocsi / autó) */}
       <View style={styles.iconContainer}>
-        <MaterialCommunityIcons name="truck" size={26} color="#1e40af" />
+        <MaterialCommunityIcons name={typeIcon(type)} size={26} color="#1e40af" />
       </View>
 
       {/* RÉSZLETEK */}
@@ -32,9 +42,15 @@ const TruckListItem = ({ brand, model, plate, status, onPress }) => {
           {title}
         </Text>
 
-        {/* RENDSZÁM: Világos badge, sötétebb betűkkel */}
-        <View style={styles.plateBadge}>
-          <Text style={styles.plateText}>{plate || "Nincs rendszám"}</Text>
+        {/* RENDSZÁM + TÍPUS */}
+        <View style={styles.metaRow}>
+          <View style={styles.plateBadge}>
+            <Text style={styles.plateText}>{plate || "Nincs rendszám"}</Text>
+          </View>
+          <View style={styles.typeBadge}>
+            <MaterialCommunityIcons name={typeIcon(type)} size={13} color="#1e40af" />
+            <Text style={styles.typeText}>{typeLabel(type)}</Text>
+          </View>
         </View>
 
         {/* STÁTUSZ */}
@@ -90,12 +106,18 @@ const styles = StyleSheet.create({
     color: "#0f172a", // ÚJ: Nagyon sötét pala/fekete szövegszín
     letterSpacing: 0.3,
   },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
+  },
   plateBadge: {
     backgroundColor: "#f1f5f9",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    marginTop: 6,
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
@@ -104,6 +126,22 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontWeight: "700",
     letterSpacing: 0.5,
+  },
+  typeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#eef2ff",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
+  },
+  typeText: {
+    fontSize: 12,
+    color: "#1e40af",
+    fontWeight: "700",
   },
   statusRow: {
     flexDirection: "row",

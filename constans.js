@@ -18,7 +18,8 @@ export const ENUM_LABELS = {
       maintenance: "Szervizben",
     },
     vehicle_type: {
-      truck: "Kamion (4×2)",
+      truck: "Nyergesvontató",
+      trailer: "Pótkocsi",
       trailer_1: "Félpótkocsi",
       trailer_2: "Megaspace pótkocsi",
       trailer_3: "Speciális pótkocsi",

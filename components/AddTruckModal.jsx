@@ -13,7 +13,12 @@ import {
   View,
 } from "react-native";
 
-import { ENUM_LABELS } from "../constans";
+// A vehicles.type enum érvényes, kisbetűs értékei (truck / trailer / car)
+const TYPE_OPTIONS = [
+  { value: "truck",   label: "Nyergesvontató" },
+  { value: "trailer", label: "Pótkocsi" },
+  { value: "car",     label: "Személyautó" },
+];
 
 const AddTruckModal = ({ visible, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -21,7 +26,7 @@ const AddTruckModal = ({ visible, onClose, onSave }) => {
     vin_number: "",
     brand: "",
     model: "",
-    type: "tractor",
+    type: "truck", // ÉRVÉNYES enum-alapérték (korábban "tractor" → INSERT hiba)
     current_km: "",
     status: "active",
   });
@@ -117,11 +122,9 @@ const AddTruckModal = ({ visible, onClose, onSave }) => {
                     onValueChange={(val) => handleInputChange("type", val)}
                     style={styles.picker}
                   >
-                    {Object.entries(ENUM_LABELS.hu.vehicle_type).map(
-                      ([key, label]) => (
-                        <Picker.Item key={key} label={label} value={key} />
-                      ),
-                    )}
+                    {TYPE_OPTIONS.map(({ value, label }) => (
+                      <Picker.Item key={value} label={label} value={value} />
+                    ))}
                   </Picker>
                 </View>
               </View>

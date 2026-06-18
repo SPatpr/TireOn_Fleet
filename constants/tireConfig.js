@@ -27,6 +27,10 @@ export const TIRE_LIMITS = {
     bar: [6.0, 7.5, 8.5],
     mm: [4, 8, 12],
   },
+  trailer: {
+    bar: [6.0, 7.5, 8.5],
+    mm: [3, 6, 10],
+  },
   trailer_1: {
     bar: [6.0, 7.5, 8.5],
     mm: [3, 6, 10],

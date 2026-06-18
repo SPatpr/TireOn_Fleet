@@ -233,6 +233,7 @@ const TruckScreen = ({ navigation, route }) => {
               model={item.model}
               plate={item.plate_number}
               status={item.status}
+              type={item.type}
               onPress={() => handleOpenEdit(item)}
             />
           )}
