@@ -6,10 +6,12 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -89,6 +91,16 @@ const ProfileScreen = ({ navigation }) => {
   const [rawRole, setRawRole] = useState(null);
   const [company, setCompany] = useState(null);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
+  // Modálok + szerkesztés
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [savingPw, setSavingPw] = useState(false);
   const [formData, setFormData] = useState({
     id: "",
     full_name: "",
@@ -226,6 +238,55 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Telefonszám szerkesztése
+  const openPhoneEdit = () => {
+    setNewPhone(formData.phone_number === "Nincs megadva" ? "" : formData.phone_number);
+    setPhoneOpen(true);
+  };
+
+  const savePhone = async () => {
+    setSavingPhone(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("profiles")
+        .update({ phone_number: newPhone.trim() || null })
+        .eq("id", user.id);
+      if (error) throw error;
+      setFormData((f) => ({ ...f, phone_number: newPhone.trim() || "Nincs megadva" }));
+      setPhoneOpen(false);
+    } catch (error) {
+      Alert.alert("Hiba", error.message || "Nem sikerült menteni a telefonszámot.");
+    } finally {
+      setSavingPhone(false);
+    }
+  };
+
+  // Jelszó módosítása
+  const savePassword = async () => {
+    if (newPw.length < 6) {
+      Alert.alert("Túl rövid", "A jelszónak legalább 6 karakter hosszúnak kell lennie.");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      Alert.alert("Nem egyezik", "A két jelszó nem egyezik.");
+      return;
+    }
+    setSavingPw(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPw });
+      if (error) throw error;
+      setPwOpen(false);
+      setNewPw("");
+      setConfirmPw("");
+      Alert.alert("Siker", "A jelszó sikeresen módosítva.");
+    } catch (error) {
+      Alert.alert("Hiba", error.message || "Nem sikerült módosítani a jelszót.");
+    } finally {
+      setSavingPw(false);
+    }
+  };
+
   const handleLogout = () => {
     Alert.alert("Kijelentkezés", "Biztosan kijelentkezel?", [
       { text: "Mégse", style: "cancel" },
@@ -282,76 +343,32 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.sectionLabel}>Elérhetőség</Text>
         <View style={styles.card}>
           <SettingRow icon="email-outline" label={formData.email || "Nincs e-mail"} sub="E-mail cím" divider />
-          <SettingRow icon="phone-outline" label={formData.phone_number} sub="Telefonszám" divider={formData.license_number !== "Nincs megadva"} />
-          {formData.license_number !== "Nincs megadva" && (
-            <SettingRow icon="card-account-details-outline" label={formData.license_number} sub="Jogosítvány" />
-          )}
+          <SettingRow
+            icon="phone-outline"
+            label={formData.phone_number}
+            sub="Telefonszám"
+            onPress={openPhoneEdit}
+            right={<MaterialCommunityIcons name="pencil" size={18} color="#94a3b8" />}
+            divider
+          />
+          <SettingRow
+            icon="lock-outline"
+            label="Jelszó módosítása"
+            sub="Új jelszó beállítása"
+            onPress={() => { setNewPw(""); setConfirmPw(""); setPwOpen(true); }}
+            right={<MaterialCommunityIcons name="chevron-right" size={22} color="#94a3b8" />}
+          />
         </View>
 
-        {/* ── BEÁLLÍTÁSOK ── */}
+        {/* ── BEÁLLÍTÁSOK (egy gomb → modal) ── */}
         <Text style={styles.sectionLabel}>Beállítások</Text>
         <View style={styles.card}>
           <SettingRow
-            icon="bell-ring-outline"
-            label="Értesítések"
-            sub="Kritikus nyomásriasztások (Push)"
-            divider
-            right={
-              <Switch
-                value={settings.notifications}
-                onValueChange={(v) => updateSetting("notifications", v)}
-                trackColor={{ false: "#cbd5e1", true: NAVY }}
-                thumbColor="#ffffff"
-                ios_backgroundColor="#cbd5e1"
-              />
-            }
-          />
-          <SettingRow
-            icon="translate"
-            label="Nyelv"
-            divider
-            right={
-              <Segmented
-                value={settings.language}
-                onChange={(v) => updateSetting("language", v)}
-                options={[{ value: "hu", label: "HU" }, { value: "en", label: "EN" }]}
-              />
-            }
-          />
-          <SettingRow
-            icon="palette-outline"
-            label="Téma"
-            divider
-            right={
-              <Segmented
-                value={settings.theme}
-                onChange={(v) => updateSetting("theme", v)}
-                options={[{ value: "dark", label: "Sötét" }, { value: "light", label: "Világos" }]}
-              />
-            }
-          />
-          <SettingRow
-            icon="gauge"
-            label="Nyomás egysége"
-            divider
-            right={
-              <Segmented
-                value={settings.pressureUnit}
-                onChange={(v) => updateSetting("pressureUnit", v)}
-                options={[{ value: "bar", label: "bar" }, { value: "psi", label: "psi" }]}
-              />
-            }
-          />
-          <SettingRow
-            icon="ruler"
-            label="Profilmélység egysége"
-            right={
-              <Segmented
-                value={settings.depthUnit}
-                onChange={(v) => updateSetting("depthUnit", v)}
-                options={[{ value: "mm", label: "mm" }, { value: "inch", label: "inch" }]}
-              />
-            }
+            icon="cog-outline"
+            label="Alkalmazás beállításai"
+            sub="Értesítések, nyelv, téma, mértékegységek"
+            onPress={() => setSettingsOpen(true)}
+            right={<MaterialCommunityIcons name="chevron-right" size={22} color="#94a3b8" />}
           />
         </View>
 
@@ -391,6 +408,145 @@ const ProfileScreen = ({ navigation }) => {
 
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      {/* ── BEÁLLÍTÁSOK MODAL (alsó lap) ── */}
+      <Modal visible={settingsOpen} transparent animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Beállítások</Text>
+              <TouchableOpacity onPress={() => setSettingsOpen(false)} style={styles.sheetClose} hitSlop={12}>
+                <Text style={styles.sheetCloseX}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.card}>
+              <SettingRow
+                icon="bell-ring-outline"
+                label="Értesítések"
+                sub="Kritikus nyomásriasztások (Push)"
+                divider
+                right={
+                  <Switch
+                    value={settings.notifications}
+                    onValueChange={(v) => updateSetting("notifications", v)}
+                    trackColor={{ false: "#cbd5e1", true: NAVY }}
+                    thumbColor="#ffffff"
+                    ios_backgroundColor="#cbd5e1"
+                  />
+                }
+              />
+              <SettingRow
+                icon="translate"
+                label="Nyelv"
+                divider
+                right={
+                  <Segmented
+                    value={settings.language}
+                    onChange={(v) => updateSetting("language", v)}
+                    options={[{ value: "hu", label: "HU" }, { value: "en", label: "EN" }]}
+                  />
+                }
+              />
+              <SettingRow
+                icon="palette-outline"
+                label="Téma"
+                divider
+                right={
+                  <Segmented
+                    value={settings.theme}
+                    onChange={(v) => updateSetting("theme", v)}
+                    options={[{ value: "dark", label: "Sötét" }, { value: "light", label: "Világos" }]}
+                  />
+                }
+              />
+              <SettingRow
+                icon="gauge"
+                label="Nyomás egysége"
+                divider
+                right={
+                  <Segmented
+                    value={settings.pressureUnit}
+                    onChange={(v) => updateSetting("pressureUnit", v)}
+                    options={[{ value: "bar", label: "bar" }, { value: "psi", label: "psi" }]}
+                  />
+                }
+              />
+              <SettingRow
+                icon="ruler"
+                label="Profilmélység egysége"
+                right={
+                  <Segmented
+                    value={settings.depthUnit}
+                    onChange={(v) => updateSetting("depthUnit", v)}
+                    options={[{ value: "mm", label: "mm" }, { value: "inch", label: "inch" }]}
+                  />
+                }
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── TELEFONSZÁM SZERKESZTÉSE ── */}
+      <Modal visible={phoneOpen} transparent animationType="fade" onRequestClose={() => setPhoneOpen(false)}>
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <Text style={styles.dialogTitle}>Telefonszám szerkesztése</Text>
+            <TextInput
+              style={styles.dialogInput}
+              value={newPhone}
+              onChangeText={setNewPhone}
+              placeholder="+36 30 123 4567"
+              placeholderTextColor="#94a3b8"
+              keyboardType="phone-pad"
+              autoFocus
+            />
+            <View style={styles.dialogBtnRow}>
+              <TouchableOpacity style={styles.dialogCancel} onPress={() => setPhoneOpen(false)}>
+                <Text style={styles.dialogCancelText}>Mégse</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dialogSave} onPress={savePhone} disabled={savingPhone}>
+                {savingPhone ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.dialogSaveText}>Mentés</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── JELSZÓ MÓDOSÍTÁSA ── */}
+      <Modal visible={pwOpen} transparent animationType="fade" onRequestClose={() => setPwOpen(false)}>
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <Text style={styles.dialogTitle}>Jelszó módosítása</Text>
+            <TextInput
+              style={styles.dialogInput}
+              value={newPw}
+              onChangeText={setNewPw}
+              placeholder="Új jelszó (min. 6 karakter)"
+              placeholderTextColor="#94a3b8"
+              secureTextEntry
+              autoFocus
+            />
+            <TextInput
+              style={[styles.dialogInput, { marginTop: 10 }]}
+              value={confirmPw}
+              onChangeText={setConfirmPw}
+              placeholder="Új jelszó megerősítése"
+              placeholderTextColor="#94a3b8"
+              secureTextEntry
+            />
+            <View style={styles.dialogBtnRow}>
+              <TouchableOpacity style={styles.dialogCancel} onPress={() => setPwOpen(false)}>
+                <Text style={styles.dialogCancelText}>Mégse</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dialogSave} onPress={savePassword} disabled={savingPw}>
+                {savingPw ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.dialogSaveText}>Mentés</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -531,4 +687,54 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   logoutText: { color: "#ef4444", fontSize: 16, fontWeight: "800", letterSpacing: 0.3 },
+
+  // Beállítások alsó lap
+  sheetOverlay: { flex: 1, backgroundColor: "rgba(0,8,20,0.6)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: "#eef2f7",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 28,
+  },
+  sheetHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12, paddingHorizontal: 4 },
+  sheetTitle: { flex: 1, fontSize: 20, fontWeight: "800", color: "#0A2342" },
+  sheetClose: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center",
+  },
+  sheetCloseX: { fontSize: 15, color: "#64748b", fontWeight: "700" },
+
+  // Telefon / jelszó dialógus
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,8,20,0.7)",
+    justifyContent: "center",
+    padding: 28,
+  },
+  dialogCard: { backgroundColor: "#ffffff", borderRadius: 22, padding: 22 },
+  dialogTitle: { fontSize: 18, fontWeight: "800", color: "#0A2342", marginBottom: 16 },
+  dialogInput: {
+    borderWidth: 1.5,
+    borderColor: "#e2e8f0",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: "#0A2342",
+    backgroundColor: "#f8fafc",
+  },
+  dialogBtnRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+  dialogCancel: {
+    flex: 1, height: 48, borderRadius: 12,
+    borderWidth: 1.5, borderColor: "#e2e8f0",
+    alignItems: "center", justifyContent: "center",
+  },
+  dialogCancelText: { color: "#64748b", fontSize: 15, fontWeight: "700" },
+  dialogSave: {
+    flex: 1.4, height: 48, borderRadius: 12,
+    backgroundColor: NAVY, alignItems: "center", justifyContent: "center",
+  },
+  dialogSaveText: { color: "#ffffff", fontSize: 15, fontWeight: "800" },
 });
