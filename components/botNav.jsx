@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { supabase } from "../lib/supabase";
@@ -16,32 +17,32 @@ const BotNav = () => {
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      try {
-        setLoading(true);
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .single();
-
-          setUserRole(profile?.role);
+  // Fókuszáláskor (is) frissül a szerepkör → szerepkör-váltás után
+  // (pl. owner-előléptetés) a tabok app-újraindítás NÉLKÜL frissülnek.
+  // A spinner csak az első betöltésnél látszik (loading kezdőértéke true).
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", user.id)
+              .single();
+            if (active) setUserRole(profile?.role);
+          }
+        } catch (error) {
+          console.error("Navigációs jogosultság hiba:", error.message);
+        } finally {
+          if (active) setLoading(false);
         }
-      } catch (error) {
-        console.error("Navigációs jogosultság hiba:", error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserRole();
-  }, []);
+      })();
+      return () => { active = false; };
+    }, []),
+  );
 
   if (loading) {
     return (

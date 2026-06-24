@@ -71,19 +71,20 @@ export const getVehicles = async () => {
 
     if (profileError || !profile) throw profileError;
 
+    const isDriver = profile.role === "driver";
+
+    // Sofőrnél INNER join → a Supabase a SZÜLŐ járműveket is szűri
+    // (nem kell az egész cég flottáját lekérni + JS-ben szűrni).
     let query = supabase
       .from("vehicles")
       .select(
-        `
-        *,
-        driver_vehicles (
-          profile_id
-        )
-      `,
+        isDriver
+          ? "*, driver_vehicles!inner(profile_id)"
+          : "*, driver_vehicles(profile_id)",
       )
       .eq("company_id", profile.company_id);
 
-    if (profile.role === "driver") {
+    if (isDriver) {
       query = query.eq("driver_vehicles.profile_id", user.id);
     }
 
@@ -92,15 +93,7 @@ export const getVehicles = async () => {
     });
 
     if (vehiclesError) throw vehiclesError;
-
-    if (profile.role === "driver") {
-      return data.filter(
-        (vehicle) =>
-          vehicle.driver_vehicles && vehicle.driver_vehicles.length > 0,
-      );
-    }
-
-    return data;
+    return data ?? [];
   } catch (error) {
     console.error("getVehicles Error:", error.message);
     throw error;

@@ -111,10 +111,10 @@ const EditEmployeeModal = ({ visible, onClose, employee, onSave, onDelete }) => 
 
             {/* KAPCSOLATI ADATOK KÁRTYA */}
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Contact Information</Text>
+              <Text style={styles.sectionTitle}>Kapcsolati adatok</Text>
 
               <View style={styles.inputRow}>
-                <Text style={styles.label}>Phone:</Text>
+                <Text style={styles.label}>Telefon:</Text>
                 <TextInput
                   value={formData.phone_number}
                   onChangeText={(t) =>
@@ -137,7 +137,7 @@ const EditEmployeeModal = ({ visible, onClose, employee, onSave, onDelete }) => 
 
             {/* BEOSZTÁS ÉS JÁRMŰ KÁRTYA */}
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Role & Assigned Truck</Text>
+              <Text style={styles.sectionTitle}>Beosztás és jármű</Text>
 
               <View style={styles.pickerWrapper}>
                 <Text style={styles.pickerLabel}>Beosztás</Text>

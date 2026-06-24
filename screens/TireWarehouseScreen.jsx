@@ -90,9 +90,11 @@ const TireWarehouseScreen = ({ navigation, route }) => {
   const [canManage, setCanManage] = useState(false); // bevételezés joga
 
   useEffect(() => {
+    let active = true;
     getProfile()
-      .then((p) => setCanManage(canManageWarehouse(p?.role)))
+      .then((p) => { if (active) setCanManage(canManageWarehouse(p?.role)); })
       .catch(() => {});
+    return () => { active = false; };
   }, []);
 
   const loadWarehouse = useCallback(async () => {

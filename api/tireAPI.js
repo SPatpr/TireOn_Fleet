@@ -307,12 +307,34 @@ export const mountStockTire = async (tireId, vehicleId, position) => {
   try {
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error("Nem vagy bejelentkezve!");
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .eq("id", user.id)
+      .single();
+    if (profileError || !profile?.company_id)
+      throw new Error("Nincs cég rendelve ehhez a fiókhoz!");
+
+    // BIZTONSÁG: a cél jármű KÖTELEZŐEN a saját céghez tartozzon,
+    // különben saját gumit idegen cég járművéhez lehetne kötni.
+    const { data: veh, error: vehError } = await supabase
+      .from("vehicles")
+      .select("id")
+      .eq("id", vehicleId)
+      .eq("company_id", profile.company_id)
+      .maybeSingle();
+    if (vehError) throw vehError;
+    if (!veh) throw new Error("A jármű nem a saját cégedhez tartozik!");
 
     const { data: mounted, error } = await supabase
       .from("tires")
       .update({ vehicle_id: vehicleId, position, status: "mounted" })
       .eq("id", tireId)
+      .eq("company_id", profile.company_id) // defense-in-depth
       .select()
       .single();
 
