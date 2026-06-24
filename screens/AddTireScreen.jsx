@@ -488,20 +488,37 @@ const AddTireScreen = ({ navigation, route }) => {
               />
             </View>
 
-            {/* Sorozatszám – auto-tölthető B opcióból */}
+            {/* Sorozatszám – auto-tölthető vonalkódból vagy OCR kamerából */}
             <Text style={styles.fieldLabel}>
               Sorozatszám / Belső kód
               {barcode ? (
                 <Text style={styles.fieldHint}> · vonalkódból beírva</Text>
               ) : null}
             </Text>
-            <TextInput
-              style={styles.textInput}
-              value={serialNumber}
-              onChangeText={(v) => { setSerialNumber(v); setBarcode(v); }}
-              placeholder="pl. MCH-2024-00441"
-              placeholderTextColor="#94a3b8"
-            />
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.textInput, { flex: 1 }]}
+                value={serialNumber}
+                onChangeText={(v) => { setSerialNumber(v); setBarcode(v); }}
+                placeholder="pl. MCH-2024-00441"
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="characters"
+              />
+              {/* OCR – gyári szám beolvasása kamerával (Google Vision) */}
+              <TouchableOpacity
+                style={styles.scanBtn}
+                activeOpacity={0.8}
+                onPress={() =>
+                  navigation?.navigate("TireCameraScan", {
+                    onScanned: (r) => {
+                      if (r?.serial) { setSerialNumber(r.serial); setBarcode(r.serial); }
+                    },
+                  })
+                }
+              >
+                <MaterialCommunityIcons name="line-scan" size={22} color="#0A2342" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* ── MÉRT ÉRTÉKEK KÁRTYA ── */}
@@ -773,7 +790,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
   noteInput: { minHeight: 72, textAlignVertical: "top" },
-  inputRow: { flexDirection: "row", gap: 8 },
+  inputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  scanBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#0A2342",
+    backgroundColor: "rgba(10,35,66,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   // Mért értékek
   measureRow: { flexDirection: "row", gap: 12 },
   measureField: { flex: 1, gap: 4 },

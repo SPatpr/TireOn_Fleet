@@ -24,6 +24,7 @@ import EmployeesScreen from "../screens/EmployeesScreen";
 import OwnerSettingsScreen from "../screens/OwnerSettingsScreen";
 import SignInScreen from "../screens/SigninScreen";
 import SignUpScreen from "../screens/SignupScreen";
+import TireCameraScanScreen from "../screens/tires/TireCameraScanScreen";
 import TiresScreen from "../screens/tires/TiresScreen";
 import TireWarehouseScreen from "../screens/TireWarehouseScreen";
 import TruckScreen from "../screens/TruckScreen";
@@ -116,6 +117,11 @@ const App = () => {
               <Stack.Screen
                 name="AddTire"
                 component={AddTireScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="TireCameraScan"
+                component={TireCameraScanScreen}
                 options={{ headerShown: false }}
               />
               <Stack.Screen

@@ -349,3 +349,52 @@ export const findTireByBarcode = async (barcodeValue) => {
     return null;
   }
 };
+
+// ─────────────────────────────────────────────────────────────
+// OCR – GYÁRI/SZÉRIASZÁM BEOLVASÁSA (Google Vision az Edge Functionön át)
+//
+// Folyamat:
+//   1) A kamerából kapott base64 feltöltése a PRIVÁT tire-scans bucketbe
+//      (a saját mappánkba: ${user.id}/scan_<ts>.jpg)
+//   2) Az ocr-tire-serial Edge Function meghívása a kép útvonalával (path)
+//      – a kulcs szerveroldalon marad, a függvény tölti le + küldi a Visionnek
+//   3) A visszakapott gyári szám (serial) + jelöltek visszaadása a UI-nak
+//
+// Visszatérés: { serial, candidates, rawText, path }  (hiba esetén throw)
+// ─────────────────────────────────────────────────────────────
+export const scanTireSerial = async (base64Image, mimeType = "image/jpeg") => {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error("Nem vagy bejelentkezve!");
+    if (!base64Image) throw new Error("Hiányzó kép a beolvasáshoz.");
+
+    // 1) Feltöltés a privát tire-scans bucketbe
+    const ext = mimeType === "image/png" ? "png" : "jpg";
+    const path = `${user.id}/scan_${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("tire-scans")
+      .upload(path, decode(base64Image), { contentType: mimeType, upsert: true });
+    if (uploadError) throw uploadError;
+
+    // 2) Edge Function (Google Vision híd) hívása a kép útvonalával
+    const { data, error } = await supabase.functions.invoke("ocr-tire-serial", {
+      body: { path },
+    });
+    if (error) throw new Error(error.message || "Az OCR feldolgozás sikertelen.");
+    if (data?.error) throw new Error(data.error);
+
+    // 3) Eredmény
+    return {
+      serial: data?.serial ?? null,
+      candidates: data?.candidates ?? [],
+      rawText: data?.rawText ?? "",
+      path,
+    };
+  } catch (error) {
+    console.error("scanTireSerial Error:", error.message);
+    throw error;
+  }
+};
