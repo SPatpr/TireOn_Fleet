@@ -1,19 +1,4 @@
-// =============================================================
-// WarehouseTireModal
-//
-// A raktáron lévő (nem felszerelt) gumik listáját jeleníti meg.
-// A felhasználó egy gumit kiválasztva az adott pozícióra szereli.
-//
-// Props:
-//   visible       {bool}
-//   positionLabel {string}  – cél pozíció felirata (pl. "Jobb Hátsó 2")
-//   tires         {array}   – raktári gumik (getStockTires eredménye)
-//   loading       {bool}
-//   onSelect      {fn}      – kiválasztott gumi átadása (tire)
-//   onClose       {fn}
-//
-// Dizájn: fehér kártyák, sötét szöveg – az app stílusát követi.
-// =============================================================
+
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
