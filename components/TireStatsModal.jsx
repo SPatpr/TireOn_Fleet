@@ -1,7 +1,12 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import {
+  Alert,
+  Image,
   Modal,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,6 +25,8 @@ const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving, limits = DEF
   const [tread,    setTread]    = useState("");
   const [status,   setStatus]   = useState("good");
   const [errors,   setErrors]   = useState({});
+  const [hasDamage,   setHasDamage]   = useState(false);
+  const [damagePhoto, setDamagePhoto] = useState(null); // { uri, base64 }
 
   useEffect(() => {
     if (tire) {
@@ -27,8 +34,36 @@ const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving, limits = DEF
       setTread(tire.tread       != null ? String(tire.tread)    : "");
       setStatus(tire.status ?? "good");
       setErrors({});
+      setHasDamage(!!tire.has_damage);
+      setDamagePhoto(null);
     }
   }, [tire, visible]);
+
+  // Sérülés-fotó kamerából vagy galériából
+  const pickDamagePhoto = () => {
+    Alert.alert("Sérülés fotó", "Honnan töltöd fel?", [
+      { text: "Kamera", onPress: () => launchDamage("camera") },
+      { text: "Galéria", onPress: () => launchDamage("library") },
+      { text: "Mégse", style: "cancel" },
+    ]);
+  };
+
+  const launchDamage = async (source) => {
+    try {
+      const perm = source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) { Alert.alert("Hiba", "Nincs engedély a kamerához/galériához."); return; }
+      const res = source === "camera"
+        ? await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true, allowsEditing: true })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: true, allowsEditing: true });
+      if (!res.canceled && res.assets?.length) {
+        setDamagePhoto({ uri: res.assets[0].uri, base64: res.assets[0].base64 });
+      }
+    } catch {
+      Alert.alert("Hiba", "Nem sikerült a kép kiválasztása.");
+    }
+  };
 
   const handleSave = () => {
     if (!tire) return;
@@ -38,7 +73,14 @@ const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving, limits = DEF
       setErrors(rangeErrors);
       return;
     }
-    onSave({ id: tire.id, pressure, tread, status });
+    onSave({
+      id: tire.id,
+      pressure,
+      tread,
+      status,
+      hasDamage,
+      damageBase64: hasDamage ? damagePhoto?.base64 ?? null : null,
+    });
   };
 
   return (
@@ -119,6 +161,52 @@ const TireStatsModal = ({ visible, onClose, tire, onSave, isSaving, limits = DEF
               );
             })}
           </View>
+
+          {/* ── SÉRÜLÉS-JELENTÉS (feltételes) ── */}
+          {!readOnly && (
+            <>
+              <View style={styles.damageRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.damageTitle}>Sérülés észlelhető</Text>
+                  <Text style={styles.damageSub}>Szövethiba, szálszakadás, vágás</Text>
+                </View>
+                <Switch
+                  value={hasDamage}
+                  onValueChange={setHasDamage}
+                  trackColor={{ false: "#cbd5e1", true: "#dc2626" }}
+                  thumbColor="#ffffff"
+                  ios_backgroundColor="#cbd5e1"
+                />
+              </View>
+
+              {hasDamage && (
+                <View style={styles.damageBox}>
+                  <TouchableOpacity style={styles.damageBtn} onPress={pickDamagePhoto} activeOpacity={0.8}>
+                    <MaterialCommunityIcons name="camera-plus-outline" size={20} color="#dc2626" />
+                    <Text style={styles.damageBtnText}>
+                      {damagePhoto ? "Másik fénykép választása" : "Fénykép feltöltése a sérülésről"}
+                    </Text>
+                  </TouchableOpacity>
+                  {damagePhoto && (
+                    <View style={styles.damagePreview}>
+                      <Image source={{ uri: damagePhoto.uri }} style={styles.damageImg} resizeMode="cover" />
+                      <TouchableOpacity style={styles.damageRemove} onPress={() => setDamagePhoto(null)}>
+                        <MaterialCommunityIcons name="close-circle" size={22} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Read-only: ha van bejelentett sérülés, jelezzük */}
+          {readOnly && tire?.has_damage && (
+            <View style={styles.damageReadonly}>
+              <MaterialCommunityIcons name="alert-octagon-outline" size={18} color="#dc2626" />
+              <Text style={styles.damageReadonlyText}>Sérülés jelentve erre a kerékre</Text>
+            </View>
+          )}
 
           {/* MENTÉS – sofőr (read-only) nézetben elrejtve */}
           {readOnly ? (
@@ -280,6 +368,50 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.2,
   },
+  // Sérülés-jelentés
+  damageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    backgroundColor: "rgba(220,38,38,0.04)",
+    marginBottom: 12,
+  },
+  damageTitle: { fontSize: 14, fontWeight: "800", color: "#0A2342" },
+  damageSub: { fontSize: 11, color: "#94a3b8", marginTop: 1 },
+  damageBox: { marginBottom: 16, gap: 10 },
+  damageBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#dc2626",
+    backgroundColor: "rgba(220,38,38,0.06)",
+  },
+  damageBtnText: { color: "#dc2626", fontSize: 14, fontWeight: "700" },
+  damagePreview: { position: "relative", borderRadius: 12, overflow: "hidden" },
+  damageImg: { width: "100%", height: 160 },
+  damageRemove: { position: "absolute", top: 8, right: 8, backgroundColor: "white", borderRadius: 11 },
+  damageReadonly: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    backgroundColor: "rgba(220,38,38,0.06)",
+    marginBottom: 14,
+  },
+  damageReadonlyText: { color: "#dc2626", fontSize: 13, fontWeight: "700" },
   saveBtn: {
     backgroundColor: "#0A2342",
     height: 50,

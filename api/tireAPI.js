@@ -19,6 +19,29 @@ export const updateTireData = async (vehicleId, tireId, updateData) => {
     if (updateData.status !== undefined)
       row.operational_status = updateData.status || null;
 
+    // SÉRÜLÉS-JELENTÉS – ha be van pipálva + van fotó, feltöltjük a
+    // tire-damages bucketbe, és elmentjük a tényt + a kép URL-jét.
+    if (updateData.hasDamage !== undefined) {
+      row.has_damage = !!updateData.hasDamage;
+      if (updateData.hasDamage && updateData.damageBase64) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const path = `${user?.id}/${vehicleId}_${tireId}_${Date.now()}.jpg`;
+        const { error: upErr } = await supabase.storage
+          .from("tire-damages")
+          .upload(path, decode(updateData.damageBase64), {
+            contentType: "image/jpeg",
+            upsert: true,
+          });
+        if (upErr) throw upErr;
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("tire-damages").getPublicUrl(path);
+        row.damage_image_url = publicUrl;
+      }
+    }
+
     const { error } = await supabase
       .from("tires")
       .upsert(row, { onConflict: "vehicle_id,position" });
@@ -36,7 +59,8 @@ export const getTiresByVehicle = async (vehicleId) => {
       .from("tires")
       .select(
         "id, position, current_bar, current_mm, status, operational_status, " +
-        "brand, model, size, serial_number, dot_number, barcode, photo_url"
+        "brand, model, size, serial_number, dot_number, barcode, photo_url, " +
+        "has_damage, damage_image_url"
       )
       .eq("vehicle_id", vehicleId)
       .eq("status", "mounted");

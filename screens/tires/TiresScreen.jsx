@@ -103,6 +103,7 @@ const TiresScreen = ({ navigation, route }) => {
               pressure: bar,
               tread: mm,
               status: row.operational_status ?? "good",
+              has_damage: !!row.has_damage,
             };
           }
         });
@@ -194,17 +195,17 @@ const TiresScreen = ({ navigation, route }) => {
     setSelectedId(null);
   };
 
-  const handleSave = async ({ id, pressure, tread, status }) => {
+  const handleSave = async ({ id, pressure, tread, status, hasDamage, damageBase64 }) => {
     setIsSaving(true);
     try {
       if (vehicleId) {
-        await updateTireData(vehicleId, id, { pressure, tread, status });
+        await updateTireData(vehicleId, id, { pressure, tread, status, hasDamage, damageBase64 });
       }
       const bar = parseFloat(pressure) || null;
       const mm  = parseFloat(tread)    || null;
       setTires((prev) => ({
         ...prev,
-        [id]: { ...prev[id], pressure: bar, tread: mm, status },
+        [id]: { ...prev[id], pressure: bar, tread: mm, status, has_damage: !!hasDamage },
       }));
       setModalVisible(false);
       setSelectedId(null);

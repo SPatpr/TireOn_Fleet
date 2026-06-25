@@ -34,17 +34,10 @@ const BRANDS = [
   "Goodyear", "Pirelli", "Hankook", "Egyéb",
 ];
 
-const COMMON_SIZES = [
-  "315/80 R22.5", "295/80 R22.5", "385/65 R22.5",
-  "315/70 R22.5", "245/70 R17.5", "Egyéb méret",
-];
-
 const emptyForm = {
   brand: "", customBrand: "",
   model: "",
-  size: "", customSize: "",
   serialNumber: "",
-  dotNumber: "",
   treadMm: "", pressureBar: "",
 };
 
@@ -79,13 +72,10 @@ const AddWarehouseTireModal = ({ visible, onClose, onSave, isSaving }) => {
     }
 
     const brand = form.brand === "Egyéb" ? form.customBrand : form.brand;
-    const size = form.size === "Egyéb méret" ? form.customSize : form.size;
     onSave({
       brand:        brand || null,
       model:        form.model.trim() || null,
-      size:         size || null,
       serialNumber: form.serialNumber.trim(),
-      dotNumber:    form.dotNumber.trim() || null,
       treadMm:      form.treadMm || null,
       pressureBar:  form.pressureBar || null,
     });
@@ -146,30 +136,6 @@ const AddWarehouseTireModal = ({ visible, onClose, onSave, isSaving }) => {
               placeholderTextColor="#94a3b8"
             />
 
-            {/* MÉRET */}
-            <Text style={styles.fieldLabel}>Méret</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {COMMON_SIZES.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.chip, form.size === s && styles.chipActive]}
-                  onPress={() => set("size", s)}
-                >
-                  <Text style={[styles.chipText, form.size === s && styles.chipTextActive]}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            {form.size === "Egyéb méret" && (
-              <TextInput
-                style={[styles.textInput, { marginTop: 6 }]}
-                value={form.customSize}
-                onChangeText={(v) => set("customSize", v)}
-                placeholder="pl. 265/70 R19.5"
-                placeholderTextColor="#94a3b8"
-                autoCapitalize="characters"
-              />
-            )}
-
             {/* GYÁRI / SZÉRIASZÁM – KÖTELEZŐ */}
             <Text style={styles.fieldLabel}>
               Gyári / Szériaszám <Text style={styles.required}>*</Text>
@@ -183,17 +149,6 @@ const AddWarehouseTireModal = ({ visible, onClose, onSave, isSaving }) => {
               autoCapitalize="characters"
             />
             {errors.serialNumber ? <Text style={styles.errorText}>{errors.serialNumber}</Text> : null}
-
-            {/* DOT SZÁM */}
-            <Text style={styles.fieldLabel}>DOT szám (gyártási idő)</Text>
-            <TextInput
-              style={styles.textInput}
-              value={form.dotNumber}
-              onChangeText={(v) => set("dotNumber", v)}
-              placeholder="pl. 4224"
-              placeholderTextColor="#94a3b8"
-              autoCapitalize="characters"
-            />
 
             {/* MÉRT ÉRTÉKEK */}
             <View style={styles.measureRow}>
