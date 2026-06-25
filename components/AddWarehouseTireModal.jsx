@@ -16,9 +16,11 @@
 // =============================================================
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -27,6 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { scanTireSerial } from "../api/tireAPI";
 import { DEFAULT_TIRE_LIMITS, validateTireValues } from "../lib/tireLimits";
 
 const BRANDS = [
@@ -44,10 +47,45 @@ const emptyForm = {
 const AddWarehouseTireModal = ({ visible, onClose, onSave, isSaving }) => {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
+  const [scanning, setScanning] = useState(false);
   const set = (key, value) => {
     setForm((f) => ({ ...f, [key]: value }));
     // a mező hibájának törlése gépeléskor
     setErrors((e) => (e[key] || e.pressure || e.tread ? { ...e, [key]: undefined } : e));
+  };
+
+  // Gyári szám beolvasása kamerával (Google Vision OCR az Edge Functionön át).
+  // A modálon belül ImagePicker-rel készítjük a fotót (navigáció nélkül, hogy
+  // az RN Modal ne takarja el a kamera-képernyőt).
+  const handleScanSerial = async () => {
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Hiba", "Engedélyezd a kamera hozzáférést a beolvasáshoz.");
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        quality: 0.85,
+        base64: true,
+        allowsEditing: true,
+      });
+      if (res.canceled || !res.assets?.length) return;
+
+      setScanning(true);
+      const result = await scanTireSerial(res.assets[0].base64, "image/jpeg");
+      if (result?.serial) {
+        set("serialNumber", result.serial);
+      } else {
+        Alert.alert(
+          "Nem sikerült felismerni",
+          "Nem találtam egyértelmű gyári számot. Próbáld újra ferde vakufénnyel, közelebbről.",
+        );
+      }
+    } catch (err) {
+      Alert.alert("Hiba", err.message || "Nem sikerült a beolvasás.");
+    } finally {
+      setScanning(false);
+    }
   };
 
   const handleSave = () => {
@@ -136,18 +174,33 @@ const AddWarehouseTireModal = ({ visible, onClose, onSave, isSaving }) => {
               placeholderTextColor="#94a3b8"
             />
 
-            {/* GYÁRI / SZÉRIASZÁM – KÖTELEZŐ */}
+            {/* GYÁRI / SZÉRIASZÁM – KÖTELEZŐ (OCR-rel segítve) */}
             <Text style={styles.fieldLabel}>
               Gyári / Szériaszám <Text style={styles.required}>*</Text>
             </Text>
-            <TextInput
-              style={[styles.textInput, errors.serialNumber && styles.inputError]}
-              value={form.serialNumber}
-              onChangeText={(v) => set("serialNumber", v)}
-              placeholder="pl. MCH-2024-00441"
-              placeholderTextColor="#94a3b8"
-              autoCapitalize="characters"
-            />
+            <View style={styles.serialRow}>
+              <TextInput
+                style={[styles.textInput, { flex: 1 }, errors.serialNumber && styles.inputError]}
+                value={form.serialNumber}
+                onChangeText={(v) => set("serialNumber", v)}
+                placeholder="pl. MCH-2024-00441"
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="characters"
+              />
+              {/* Google Vision OCR – gyári szám beolvasása kamerával */}
+              <TouchableOpacity
+                style={styles.scanBtn}
+                activeOpacity={0.8}
+                onPress={handleScanSerial}
+                disabled={scanning}
+              >
+                {scanning ? (
+                  <ActivityIndicator color="#0A2342" size="small" />
+                ) : (
+                  <MaterialCommunityIcons name="line-scan" size={22} color="#0A2342" />
+                )}
+              </TouchableOpacity>
+            </View>
             {errors.serialNumber ? <Text style={styles.errorText}>{errors.serialNumber}</Text> : null}
 
             {/* MÉRT ÉRTÉKEK */}
@@ -273,6 +326,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
   inputError: { borderColor: "#dc2626", backgroundColor: "rgba(220,38,38,0.05)" },
+  serialRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  scanBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#0A2342",
+    backgroundColor: "rgba(10,35,66,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   errorText: { color: "#dc2626", fontSize: 12, fontWeight: "600", marginTop: 6 },
   measureRow: { flexDirection: "row", gap: 12 },
   measureField: { flex: 1 },
